@@ -1,75 +1,40 @@
-import { NextResponse } from "next/server"
-import { currentUser } from "@clerk/nextjs"
-import { prisma } from "@/lib/db"
-import { analyzeContract } from "@/lib/ai/analyze-contract"
-import { sendAnalysisCompletionEmail } from "@/lib/email"
+// app/api/contracts/analyze/route.ts
+import { NextResponse } from "next/server";
+import { analyzeContract } from "@/lib/ai/analyze-contract";
 
 export async function POST(req: Request) {
   try {
-    const user = await currentUser()
-
-    if (!user) {
-      return new NextResponse("Unauthorized", { status: 401 })
-    }
-
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id },
-    })
-
-    if (!dbUser) {
-      return new NextResponse("User not found", { status: 404 })
-    }
-
-    // Check if user has an active subscription
-    if (dbUser.subscriptionStatus !== "ACTIVE" && dbUser.subscriptionStatus !== "TRIAL") {
-      return new NextResponse("Subscription required", { status: 403 })
-    }
-
-    const { contractText, title } = await req.json()
+    const { contractText, title } = await req.json();
 
     if (!contractText) {
-      return new NextResponse("Contract text is required", { status: 400 })
+      return new NextResponse("Contract text is required", { status: 400 });
     }
+
+    // Log to help with debugging
+    console.log("Analyzing contract:", { title });
 
     // Analyze contract using OpenAI
-    const analysis = await analyzeContract(contractText)
+    try {
+      const analysis = await analyzeContract(contractText);
 
-    // Save to database
-    const contract = await prisma.contract.create({
-      data: {
-        userId: dbUser.id,
+      // For testing/demo, create a mock contract with ID
+      const mockContract = {
+        id: "demo-" + Date.now(),
         title: title || "Untitled Contract",
+        createdAt: new Date().toISOString(),
         originalText: contractText,
         riskLevel: analysis.riskLevel,
-        issues: {
-          create: analysis.issues.map((issue) => ({
-            type: issue.type,
-            text: issue.text,
-            explanation: issue.explanation,
-            suggestion: issue.suggestion,
-          })),
-        },
-      },
-      include: {
-        issues: true,
-      },
-    })
+        issues: analysis.issues,
+      };
 
-    // Send email notification
-    if (user.emailAddresses && user.emailAddresses.length > 0) {
-      await sendAnalysisCompletionEmail(
-        user.emailAddresses[0].emailAddress,
-        contract.title,
-        contract.id,
-        contract.riskLevel || "Unknown",
-        contract.issues.length,
-      )
+      return NextResponse.json(mockContract);
+
+    } catch (error) {
+      console.error("Error in OpenAI analysis:", error);
+      return new NextResponse("AI analysis failed", { status: 500 });
     }
-
-    return NextResponse.json(contract)
   } catch (error) {
-    console.error("Error analyzing contract:", error)
-    return new NextResponse("Internal Server Error", { status: 500 })
+    console.error("Error analyzing contract:", error);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
-

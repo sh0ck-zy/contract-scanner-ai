@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { currentUser } from "@clerk/nextjs"
-import { prisma } from "@/lib/db"
+import { auth, currentUser } from "@clerk/nextjs/server"
+import prisma from "@/lib/db"
 import { createBillingPortalSession } from "@/lib/stripe"
 
 export async function POST(req: Request) {

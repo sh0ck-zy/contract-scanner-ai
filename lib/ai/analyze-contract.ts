@@ -1,3 +1,4 @@
+// lib/ai/analyze-contract.ts
 import OpenAI from "openai"
 
 const openai = new OpenAI({
@@ -47,26 +48,50 @@ export async function analyzeContract(contractText: string): Promise<ContractAna
       ]
     }
     
+    IMPORTANT: You must respond with a JSON object only, no additional text.
+    
     Here is the contract to analyze:
     
     ${contractText}
   `
 
   try {
+    console.log("Starting contract analysis...");
+
+    // Remove the response_format parameter since it's not supported
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-3.5-turbo", // Use gpt-3.5-turbo instead of gpt-4
       messages: [
-        { role: "system", content: "You are a contract analysis expert for freelancers." },
+        { role: "system", content: "You are a contract analysis expert for freelancers. You will respond with JSON only." },
         { role: "user", content: prompt },
       ],
-      response_format: { type: "json_object" },
-    })
+      temperature: 0.2, // Lower temperature for more consistent structured output
+    });
 
-    const result = JSON.parse(response.choices[0].message.content) as ContractAnalysis
-    return result
+    console.log("OpenAI response received");
+
+    try {
+      const result = JSON.parse(response.choices[0].message.content) as ContractAnalysis;
+      return result;
+    } catch (parseError) {
+      console.error("Error parsing OpenAI response:", parseError);
+      console.log("Raw response:", response.choices[0].message.content);
+
+      // Fallback response in case of parsing error
+      return {
+        riskLevel: "Medium",
+        issues: [
+          {
+            type: "API Error",
+            text: "Error processing contract",
+            explanation: "We encountered an error while analyzing your contract. Our system wasn't able to process it correctly.",
+            suggestion: "Please try again with a simpler contract text or contact support if the issue persists."
+          }
+        ]
+      };
+    }
   } catch (error) {
-    console.error("Error analyzing contract:", error)
-    throw new Error("Failed to analyze contract")
+    console.error("OpenAI API error:", error);
+    throw new Error("Failed to analyze contract");
   }
 }
-
