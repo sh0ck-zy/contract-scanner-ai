@@ -1,0 +1,45 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  clerkId            String    @unique
+  email              String    @unique
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  stripeCustomerId   String?
+  subscriptionStatus String?   @default("FREE")
+  subscriptionId     String?
+  contracts          Contract[]
+}
+
+model Contract {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  originalText   String    @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  riskLevel      String?
+  issues         Issue[]
+}
+
+model Issue {
+  id             String    @id @default(uuid())
+  contractId     String
+  contract       Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  type           String
+  text           String    @db.Text
+  explanation    String    @db.Text
+  suggestion     String    @db.Text
+  createdAt      DateTime  @default(now())
+}
+
