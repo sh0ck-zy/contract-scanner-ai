@@ -1,75 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Plus, Search } from "lucide-react"
+import { FileText, Loader2, Plus, Search } from "lucide-react"
 import ContractCard from "@/components/contract-card"
+import { useToast } from "@/hooks/use-toast"
+
+interface Contract {
+  id: string
+  title: string
+  createdAt: string
+  riskLevel: "High" | "Medium" | "Low"
+  issues: any[]
+}
 
 export default function ContractsPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [riskFilter, setRiskFilter] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Mock data for contracts
-  const allContracts = [
-    {
-      id: "123",
-      title: "Website Development Agreement",
-      createdAt: new Date().toISOString(),
-      riskLevel: "High" as const,
-      issues: new Array(4),
-    },
-    {
-      id: "456",
-      title: "Graphic Design Contract",
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: "Medium" as const,
-      issues: new Array(2),
-    },
-    {
-      id: "789",
-      title: "Content Writing Agreement",
-      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: "Low" as const,
-      issues: new Array(1),
-    },
-    {
-      id: "101",
-      title: "Mobile App Development Contract",
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: "High" as const,
-      issues: new Array(5),
-    },
-    {
-      id: "102",
-      title: "Logo Design Agreement",
-      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: "Low" as const,
-      issues: new Array(1),
-    },
-    {
-      id: "103",
-      title: "SEO Consulting Agreement",
-      createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: "Medium" as const,
-      issues: new Array(3),
-    },
-    {
-      id: "104",
-      title: "Social Media Management Contract",
-      createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-      riskLevel: "Medium" as const,
-      issues: new Array(2),
-    },
-  ]
+  useEffect(() => {
+    const fetchContracts = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch("/api/contracts")
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch contracts")
+        }
+
+        const data = await response.json()
+        setContracts(data)
+      } catch (error) {
+        console.error("Error fetching contracts:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load contracts. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchContracts()
+  }, [toast])
 
   // Filter and sort contracts
-  const filteredContracts = allContracts
+  const filteredContracts = contracts
     .filter((contract) => {
       // Filter by search query
       const matchesSearch = contract.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -87,10 +73,10 @@ export default function ContractsPage() {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       } else if (sortBy === "risk-high") {
         const riskOrder = { High: 3, Medium: 2, Low: 1 }
-        return riskOrder[b.riskLevel] - riskOrder[a.riskLevel]
+        return riskOrder[b.riskLevel as keyof typeof riskOrder] - riskOrder[a.riskLevel as keyof typeof riskOrder]
       } else if (sortBy === "risk-low") {
         const riskOrder = { High: 3, Medium: 2, Low: 1 }
-        return riskOrder[a.riskLevel] - riskOrder[b.riskLevel]
+        return riskOrder[a.riskLevel as keyof typeof riskOrder] - riskOrder[b.riskLevel as keyof typeof riskOrder]
       }
       return 0
     })
@@ -153,7 +139,12 @@ export default function ContractsPage() {
         </CardContent>
       </Card>
 
-      {filteredContracts.length > 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+          <p className="text-neutral-600">Loading contracts...</p>
+        </div>
+      ) : filteredContracts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContracts.map((contract) => (
             <ContractCard

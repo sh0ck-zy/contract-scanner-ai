@@ -4,8 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 
+interface Contract {
+  id: string
+  title: string
+  createdAt: string
+  riskLevel: "High" | "Medium" | "Low"
+  issues: any[]
+}
+
 interface ContractStatsProps {
-  contracts: any[]
+  contracts: Contract[]
 }
 
 export default function ContractStats({ contracts }: ContractStatsProps) {
@@ -15,7 +23,7 @@ export default function ContractStats({ contracts }: ContractStatsProps) {
       acc[contract.riskLevel]++
       return acc
     },
-    { High: 0, Medium: 0, Low: 0 },
+    { High: 0, Medium: 0, Low: 0 } as Record<string, number>,
   )
 
   const riskData = [
@@ -26,25 +34,10 @@ export default function ContractStats({ contracts }: ContractStatsProps) {
 
   // Calculate issue types
   const issueTypes = contracts.reduce((acc: Record<string, number>, contract) => {
-    // In a real app, we would iterate through actual issues
-    // For this demo, we'll use mock data
-    const mockIssueTypes = [
-      "Payment Terms",
-      "Scope of Work",
-      "Intellectual Property",
-      "Termination Clause",
-      "Liability",
-      "Revisions",
-    ]
-
-    // Randomly assign issues based on contract risk level
-    const numIssues = contract.riskLevel === "High" ? 3 : contract.riskLevel === "Medium" ? 2 : 1
-
-    for (let i = 0; i < numIssues; i++) {
-      const randomIssue = mockIssueTypes[Math.floor(Math.random() * mockIssueTypes.length)]
-      acc[randomIssue] = (acc[randomIssue] || 0) + 1
-    }
-
+    // Group issues by type
+    contract.issues.forEach((issue) => {
+      acc[issue.type] = (acc[issue.type] || 0) + 1
+    })
     return acc
   }, {})
 

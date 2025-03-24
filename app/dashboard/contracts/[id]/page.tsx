@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,9 +36,12 @@ interface Contract {
 }
 
 export default function ContractResultsPage({ params }: { params: { id: string } }) {
+  // Unwrap params using React.use
+  const unwrappedParams = use(params)
+  const contractId = unwrappedParams.id
+
   const router = useRouter()
   const { toast } = useToast()
-  const { id } = params
   const [contract, setContract] = useState<Contract | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("issues")
@@ -50,7 +53,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
       try {
         setIsLoading(true)
 
-        const response = await fetch(`/api/contracts/${id}`)
+        const response = await fetch(`/api/contracts/${contractId}`)
 
         if (!response.ok) {
           throw new Error("Failed to fetch contract")
@@ -72,8 +75,9 @@ export default function ContractResultsPage({ params }: { params: { id: string }
     }
 
     fetchContractData()
-  }, [id, router, toast])
+  }, [contractId, router, toast])
 
+  // Rest of your component remains the same
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text)
     setCopiedIndex(index)
@@ -133,6 +137,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Rest of your component JSX */}
       <div className="mb-6">
         <Button variant="ghost" className="flex items-center gap-2 mb-4" onClick={() => router.push("/dashboard")}>
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
@@ -150,13 +155,12 @@ export default function ContractResultsPage({ params }: { params: { id: string }
             <div className="flex items-center mr-6">
               {getRiskIcon(contract.riskLevel)}
               <span
-                className={`ml-2 font-semibold ${
-                  contract.riskLevel === "High"
+                className={`ml-2 font-semibold ${contract.riskLevel === "High"
                     ? "text-[#EF4444]"
                     : contract.riskLevel === "Medium"
                       ? "text-[#F59E0B]"
                       : "text-[#10B981]"
-                }`}
+                  }`}
               >
                 {contract.riskLevel} Risk
               </span>
@@ -170,6 +174,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Summary card */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
@@ -180,13 +185,12 @@ export default function ContractResultsPage({ params }: { params: { id: string }
                 <div className="flex items-center justify-between border-b pb-4">
                   <span className="text-neutral-600">Risk Level</span>
                   <span
-                    className={`font-semibold ${
-                      contract.riskLevel === "High"
+                    className={`font-semibold ${contract.riskLevel === "High"
                         ? "text-[#EF4444]"
                         : contract.riskLevel === "Medium"
                           ? "text-[#F59E0B]"
                           : "text-[#10B981]"
-                    }`}
+                      }`}
                   >
                     {contract.riskLevel}
                   </span>
@@ -225,6 +229,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
           </Card>
         </div>
 
+        {/* The rest of your component remains the same */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="issues" className="w-full" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-2 mb-6">
@@ -240,13 +245,12 @@ export default function ContractResultsPage({ params }: { params: { id: string }
               {contract.issues.map((issue: Issue, index: number) => (
                 <Card
                   key={issue.id}
-                  className={`border-l-4 ${
-                    issue.type.includes("Payment") || issue.type.includes("Copyright")
+                  className={`border-l-4 ${issue.type.includes("Payment") || issue.type.includes("Copyright")
                       ? "border-l-[#EF4444]"
                       : issue.type.includes("Revision") || issue.type.includes("Termination")
                         ? "border-l-[#F59E0B]"
                         : "border-l-[#0D9488]"
-                  }`}
+                    }`}
                 >
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg">{issue.type}</CardTitle>
@@ -308,4 +312,3 @@ export default function ContractResultsPage({ params }: { params: { id: string }
     </div>
   )
 }
-

@@ -25,10 +25,10 @@ export default function AboutPage() {
             </Link>
           </nav>
           <div className="flex items-center space-x-4">
-            <Link href="/login">
+            <Link href="/sign-in">
               <Button variant="ghost">Log in</Button>
             </Link>
-            <Link href="/signup">
+            <Link href="/sign-up">
               <Button className="bg-primary hover:bg-primary/90 text-white">Try For Free</Button>
             </Link>
           </div>
@@ -149,9 +149,8 @@ export default function AboutPage() {
               ].map((issue, index) => (
                 <Card key={index} className="overflow-hidden">
                   <div
-                    className={`h-2 ${
-                      issue.risk === "High" ? "bg-[#EF4444]" : issue.risk === "Medium" ? "bg-[#F59E0B]" : "bg-[#10B981]"
-                    }`}
+                    className={`h-2 ${issue.risk === "High" ? "bg-[#EF4444]" : issue.risk === "Medium" ? "bg-[#F59E0B]" : "bg-[#10B981]"
+                      }`}
                   ></div>
                   <CardContent className="p-6">
                     <h3 className="text-xl font-semibold mb-3">{issue.title}</h3>
@@ -160,13 +159,12 @@ export default function AboutPage() {
                       <p className="text-sm font-mono text-neutral-700">{issue.example}</p>
                       <div className="flex items-center mt-2">
                         <span
-                          className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            issue.risk === "High"
+                          className={`text-xs font-semibold px-2 py-1 rounded-full ${issue.risk === "High"
                               ? "bg-[#EF4444]/10 text-[#EF4444]"
                               : issue.risk === "Medium"
                                 ? "bg-[#F59E0B]/10 text-[#F59E0B]"
                                 : "bg-[#10B981]/10 text-[#10B981]"
-                          }`}
+                            }`}
                         >
                           {issue.risk} Risk
                         </span>
@@ -185,7 +183,7 @@ export default function AboutPage() {
             <p className="text-xl mb-8 max-w-2xl mx-auto">
               Start analyzing your contracts today and negotiate with confidence.
             </p>
-            <Link href="/signup">
+            <Link href="/sign-up">
               <Button className="bg-white text-primary hover:bg-neutral-100 font-medium py-2 px-6 rounded-md transition duration-200 text-lg">
                 Try ContractScan Free
               </Button>

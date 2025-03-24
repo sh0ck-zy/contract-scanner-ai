@@ -1,9 +1,61 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle } from "lucide-react"
+import { CheckCircle, Loader2 } from "lucide-react"
+import { useUser } from "@clerk/nextjs"
+import { useToast } from "@/hooks/use-toast"
 
 export default function PricingPage() {
+  const router = useRouter()
+  const { isSignedIn, isLoaded } = useUser()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState<string | null>(null)
+
+  const handleSubscribe = async (plan: string) => {
+    if (!isLoaded) return
+
+    if (!isSignedIn) {
+      // Redirect to sign up page
+      router.push(`/sign-up?plan=${plan}`)
+      return
+    }
+
+    try {
+      setIsLoading(plan)
+
+      // Call the API to create a checkout session
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to create checkout session")
+      }
+
+      const { url } = await response.json()
+
+      // Redirect to Stripe checkout
+      window.location.href = url
+    } catch (error) {
+      console.error("Error creating checkout session:", error)
+      toast({
+        title: "Error",
+        description: "Failed to start subscription process. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(null)
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-neutral-200">
@@ -25,12 +77,22 @@ export default function PricingPage() {
             </Link>
           </nav>
           <div className="flex items-center space-x-4">
-            <Link href="/login">
-              <Button variant="ghost">Log in</Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-primary hover:bg-primary/90 text-white">Try For Free</Button>
-            </Link>
+            {isLoaded && !isSignedIn ? (
+              <>
+                <Link href="/sign-in">
+                  <Button variant="ghost">Log in</Button>
+                </Link>
+                <Link href="/sign-up">
+                  <Button className="bg-primary hover:bg-primary/90 text-white">Try For Free</Button>
+                </Link>
+              </>
+            ) : isLoaded && isSignedIn ? (
+              <Link href="/dashboard">
+                <Button className="bg-primary hover:bg-primary/90 text-white">Dashboard</Button>
+              </Link>
+            ) : (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            )}
           </div>
         </div>
       </header>
@@ -71,9 +133,20 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Link href="/signup" className="w-full">
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-white">Start Free Trial</Button>
-                </Link>
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90 text-white"
+                  onClick={() => router.push("/sign-up")}
+                  disabled={isLoading === "trial"}
+                >
+                  {isLoading === "trial" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Start Free Trial"
+                  )}
+                </Button>
               </CardFooter>
             </Card>
 
@@ -108,9 +181,20 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Link href="/signup" className="w-full">
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-white">Get Started</Button>
-                </Link>
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90 text-white"
+                  onClick={() => handleSubscribe("monthly")}
+                  disabled={!!isLoading}
+                >
+                  {isLoading === "monthly" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Get Started"
+                  )}
+                </Button>
               </CardFooter>
             </Card>
 
@@ -145,9 +229,20 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Link href="/signup" className="w-full">
-                  <Button className="w-full bg-primary hover:bg-primary/90 text-white">Get Started</Button>
-                </Link>
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90 text-white"
+                  onClick={() => handleSubscribe("yearly")}
+                  disabled={!!isLoading}
+                >
+                  {isLoading === "yearly" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Get Started"
+                  )}
+                </Button>
               </CardFooter>
             </Card>
           </div>

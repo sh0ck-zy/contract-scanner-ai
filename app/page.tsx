@@ -22,10 +22,10 @@ export default function LandingPage() {
             </Link>
           </nav>
           <div className="flex items-center space-x-4">
-            <Link href="/login">
+            <Link href="/sign-in">
               <Button variant="ghost">Log in</Button>
             </Link>
-            <Link href="/signup">
+            <Link href="/sign-up">
               <Button className="bg-primary hover:bg-primary/90 text-white">Try For Free</Button>
             </Link>
           </div>
@@ -44,12 +44,12 @@ export default function LandingPage() {
                 alternatives.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                <Link href="/signup">
+                <Link href="/sign-up">
                   <Button className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-md transition duration-200">
                     Start Free Trial
                   </Button>
                 </Link>
-                <Link href="/how-it-works">
+                <Link href="/about">
                   <Button
                     variant="outline"
                     className="w-full sm:w-auto border border-primary text-primary hover:bg-primary/10 font-medium py-2 px-4 rounded-md transition duration-200"
@@ -137,7 +137,7 @@ export default function LandingPage() {
             </div>
 
             <div className="mt-12 text-center">
-              <Link href="/signup">
+              <Link href="/sign-up">
                 <Button className="bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-md transition duration-200">
                   Try ContractScan Free
                 </Button>
@@ -175,28 +175,8 @@ export default function LandingPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/how-it-works" className="text-neutral-600 hover:text-primary transition">
-                    How It Works
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2">
-                <li>
                   <Link href="/about" className="text-neutral-600 hover:text-primary transition">
-                    About Us
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/blog" className="text-neutral-600 hover:text-primary transition">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="text-neutral-600 hover:text-primary transition">
-                    Contact
+                    How It Works
                   </Link>
                 </li>
               </ul>

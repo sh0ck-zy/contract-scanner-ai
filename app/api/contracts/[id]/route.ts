@@ -1,21 +1,25 @@
-import { NextResponse } from "next/server"
-import { auth, currentUser } from "@clerk/nextjs/server"
-import prisma from "@/lib/db"
+// app/api/contracts/[id]/route.ts
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import prisma from "@/lib/db";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const user = await currentUser()
+    const { userId } = await auth();
 
-    if (!user) {
-      return new NextResponse("Unauthorized", { status: 401 })
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
     }
 
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: user.id },
-    })
+      where: { clerkId: userId },
+    });
 
     if (!dbUser) {
-      return new NextResponse("User not found", { status: 404 })
+      return new NextResponse("User not found", { status: 404 });
     }
 
     // Get the contract
@@ -25,16 +29,15 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         userId: dbUser.id, // Ensure the contract belongs to the user
       },
       include: { issues: true },
-    })
+    });
 
     if (!contract) {
-      return new NextResponse("Contract not found", { status: 404 })
+      return new NextResponse("Contract not found", { status: 404 });
     }
 
-    return NextResponse.json(contract)
+    return NextResponse.json(contract);
   } catch (error) {
-    console.error("Error fetching contract:", error)
-    return new NextResponse("Internal Server Error", { status: 500 })
+    console.error("Error fetching contract:", error);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
-

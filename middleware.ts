@@ -1,11 +1,12 @@
 // middleware.ts
-import { NextResponse } from "next/server";
+import { authMiddleware } from "@clerk/nextjs";
 
-export function middleware(request) {
-  // For now, just let all requests through
-  return NextResponse.next();
-}
+// Este middleware do Clerk gerencia a autenticação
+export default authMiddleware({
+  // Rotas que serão acessíveis sem autenticação
+  publicRoutes: ["/", "/pricing", "/about", "/api/webhooks(.*)"],
+});
 
 export const config = {
-  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
+  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
 };
