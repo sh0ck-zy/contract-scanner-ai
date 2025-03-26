@@ -11,5 +11,6 @@ if (process.env.NODE_ENV !== "production") {
   global.prisma = prismadb
 }
 
-// Export the Prisma client as the default export
+// Export both named and default exports for compatibility
+export const prisma = prismadb
 export default prismadb

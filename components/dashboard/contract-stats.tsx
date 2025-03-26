@@ -10,6 +10,7 @@ interface Contract {
   createdAt: string
   riskLevel: "High" | "Medium" | "Low"
   issues: any[]
+  contractType?: string
 }
 
 interface ContractStatsProps {
@@ -17,8 +18,11 @@ interface ContractStatsProps {
 }
 
 export default function ContractStats({ contracts }: ContractStatsProps) {
+  // Filter out generated contracts for risk distribution
+  const analyzedContracts = contracts.filter((c) => c.contractType !== "GENERATED")
+
   // Calculate risk distribution
-  const riskDistribution = contracts.reduce(
+  const riskDistribution = analyzedContracts.reduce(
     (acc, contract) => {
       acc[contract.riskLevel]++
       return acc
@@ -33,7 +37,7 @@ export default function ContractStats({ contracts }: ContractStatsProps) {
   ]
 
   // Calculate issue types
-  const issueTypes = contracts.reduce((acc: Record<string, number>, contract) => {
+  const issueTypes = analyzedContracts.reduce((acc: Record<string, number>, contract) => {
     // Group issues by type
     contract.issues.forEach((issue) => {
       acc[issue.type] = (acc[issue.type] || 0) + 1
@@ -46,8 +50,14 @@ export default function ContractStats({ contracts }: ContractStatsProps) {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5) // Top 5 issues
 
+  // Calculate contract types
+  const contractTypeData = [
+    { name: "Analyzed", value: analyzedContracts.length, fill: "#1E3A8A" },
+    { name: "Generated", value: contracts.length - analyzedContracts.length, fill: "#0D9488" },
+  ]
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Risk Distribution</CardTitle>
@@ -101,6 +111,31 @@ export default function ContractStats({ contracts }: ContractStatsProps) {
                 <YAxis dataKey="name" type="category" width={150} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="value" fill="#1E3A8A" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Contract Types</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer
+            config={{
+              value: {
+                label: "Count",
+              },
+            }}
+            className="h-[300px]"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={contractTypeData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>

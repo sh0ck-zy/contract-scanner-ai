@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +17,8 @@ import {
   Loader2,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { ComplianceAlerts } from "@/components/compliance-alerts"
+import { EducationalResources } from "@/components/educational-resources"
 
 interface Issue {
   id: string
@@ -24,6 +26,8 @@ interface Issue {
   text: string
   explanation: string
   suggestion: string
+  severityScore?: number
+  industryRelevance?: string[]
 }
 
 interface Contract {
@@ -33,15 +37,19 @@ interface Contract {
   riskLevel: "High" | "Medium" | "Low"
   originalText: string
   issues: Issue[]
+  recommendedActions?: string[]
+  complianceFlags?: string[]
+  metadata?: {
+    industry?: string
+    region?: string
+    industrySpecificRisk?: Record<string, number>
+  }
 }
 
 export default function ContractResultsPage({ params }: { params: { id: string } }) {
-  // Unwrap params using React.use
-  const unwrappedParams = use(params)
-  const contractId = unwrappedParams.id
-
   const router = useRouter()
   const { toast } = useToast()
+  const { id } = params
   const [contract, setContract] = useState<Contract | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("issues")
@@ -53,7 +61,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
       try {
         setIsLoading(true)
 
-        const response = await fetch(`/api/contracts/${contractId}`)
+        const response = await fetch(`/api/contracts/${id}`)
 
         if (!response.ok) {
           throw new Error("Failed to fetch contract")
@@ -75,9 +83,8 @@ export default function ContractResultsPage({ params }: { params: { id: string }
     }
 
     fetchContractData()
-  }, [contractId, router, toast])
+  }, [id, router, toast])
 
-  // Rest of your component remains the same
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text)
     setCopiedIndex(index)
@@ -135,9 +142,36 @@ export default function ContractResultsPage({ params }: { params: { id: string }
     }
   }
 
+  // Get the most common issue type for educational resources
+  const getMainIssueType = () => {
+    if (!contract.issues || contract.issues.length === 0) return "general"
+
+    const issueTypes = contract.issues.map((issue) => issue.type.toLowerCase())
+    const typeCount: Record<string, number> = {}
+
+    issueTypes.forEach((type) => {
+      if (type.includes("payment")) typeCount["payment_terms"] = (typeCount["payment_terms"] || 0) + 1
+      else if (type.includes("revision")) typeCount["revision_policy"] = (typeCount["revision_policy"] || 0) + 1
+      else if (type.includes("intellectual") || type.includes("copyright"))
+        typeCount["intellectual_property"] = (typeCount["intellectual_property"] || 0) + 1
+      else if (type.includes("scope")) typeCount["scope_definition"] = (typeCount["scope_definition"] || 0) + 1
+    })
+
+    let maxType = "general"
+    let maxCount = 0
+
+    Object.entries(typeCount).forEach(([type, count]) => {
+      if (count > maxCount) {
+        maxType = type
+        maxCount = count
+      }
+    })
+
+    return maxType
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Rest of your component JSX */}
       <div className="mb-6">
         <Button variant="ghost" className="flex items-center gap-2 mb-4" onClick={() => router.push("/dashboard")}>
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
@@ -174,8 +208,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Summary card */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Summary</CardTitle>
@@ -227,9 +260,32 @@ export default function ContractResultsPage({ params }: { params: { id: string }
               </div>
             </CardContent>
           </Card>
+
+          {contract.recommendedActions && contract.recommendedActions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recommended Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {contract.recommendedActions.map((action, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Check className="h-4 w-4 text-primary mt-1" />
+                      <span className="text-sm">{action}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {contract.complianceFlags && (
+            <ComplianceAlerts complianceFlags={contract.complianceFlags} region={contract.metadata?.region || "US"} />
+          )}
+
+          <EducationalResources industry={contract.metadata?.industry || "general"} issueType={getMainIssueType()} />
         </div>
 
-        {/* The rest of your component remains the same */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="issues" className="w-full" onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-2 mb-6">
@@ -253,7 +309,21 @@ export default function ContractResultsPage({ params }: { params: { id: string }
                     }`}
                 >
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{issue.type}</CardTitle>
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span>{issue.type}</span>
+                      {issue.severityScore && (
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${issue.severityScore > 7
+                              ? "bg-red-100 text-red-700"
+                              : issue.severityScore > 4
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-green-100 text-green-700"
+                            }`}
+                        >
+                          Severity: {issue.severityScore}/10
+                        </span>
+                      )}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="bg-[#EF4444]/5 border-l-4 border-[#EF4444] rounded p-4">
@@ -282,6 +352,16 @@ export default function ContractResultsPage({ params }: { params: { id: string }
                         )}
                       </Button>
                     </div>
+
+                    {issue.industryRelevance && issue.industryRelevance.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {issue.industryRelevance.map((industry, i) => (
+                          <span key={i} className="text-xs bg-neutral-100 px-2 py-1 rounded-full">
+                            {industry}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -312,3 +392,4 @@ export default function ContractResultsPage({ params }: { params: { id: string }
     </div>
   )
 }
+

@@ -76,12 +76,25 @@ export async function getOrCreateCustomer(userId: string, email: string) {
 /**
  * Create a billing portal session for managing subscriptions
  */
-export async function createBillingPortalSession(customerId: string, returnUrl: string) {
+export async function createPortalSession(customerId: string, returnUrl: string) {
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: returnUrl,
   })
 
   return session
+}
+
+/**
+ * Get subscription details for a customer
+ */
+export async function getSubscription(customerId: string) {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'active',
+    expand: ['data.default_payment_method'],
+  })
+
+  return subscriptions.data[0]
 }
 

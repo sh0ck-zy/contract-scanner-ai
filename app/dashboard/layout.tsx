@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -18,6 +19,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Check authentication first
+  const { userId } = auth();
+
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  // Only fetch user details if authenticated
   const user = await currentUser()
 
   // Fallback user info in case Clerk data is missing

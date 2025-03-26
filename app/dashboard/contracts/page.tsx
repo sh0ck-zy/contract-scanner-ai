@@ -1,180 +1,275 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Loader2, Plus, Search } from "lucide-react"
-import ContractCard from "@/components/contract-card"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { FileText, Loader2, Upload, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { IndustrySelector } from "@/components/industry-selector"
+import { RegionSelector } from "@/components/region-selector"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-interface Contract {
-  id: string
-  title: string
-  createdAt: string
-  riskLevel: "High" | "Medium" | "Low"
-  issues: any[]
-}
-
-export default function ContractsPage() {
+export default function AnalyzeContractPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [riskFilter, setRiskFilter] = useState("all")
-  const [sortBy, setSortBy] = useState("newest")
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [title, setTitle] = useState("")
+  const [contractText, setContractText] = useState("")
+  const [file, setFile] = useState<File | null>(null)
+  const [activeTab, setActiveTab] = useState("paste")
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [industry, setIndustry] = useState("general")
+  const [region, setRegion] = useState("US")
 
-  useEffect(() => {
-    const fetchContracts = async () => {
-      try {
-        setIsLoading(true)
-        const response = await fetch("/api/contracts")
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0])
+    }
+  }
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch contracts")
-        }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-        const data = await response.json()
-        setContracts(data)
-      } catch (error) {
-        console.error("Error fetching contracts:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load contracts. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
+    if (activeTab === "paste" && !contractText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter your contract text",
+        variant: "destructive",
+      })
+      return
     }
 
-    fetchContracts()
-  }, [toast])
+    if (activeTab === "upload" && !file) {
+      toast({
+        title: "Error",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      })
+      return
+    }
 
-  // Filter and sort contracts
-  const filteredContracts = contracts
-    .filter((contract) => {
-      // Filter by search query
-      const matchesSearch = contract.title.toLowerCase().includes(searchQuery.toLowerCase())
+    try {
+      setIsAnalyzing(true)
 
-      // Filter by risk level
-      const matchesRisk = riskFilter === "all" || contract.riskLevel === riskFilter
+      let textToAnalyze = contractText
 
-      return matchesSearch && matchesRisk
-    })
-    .sort((a, b) => {
-      // Sort by date or risk level
-      if (sortBy === "newest") {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      } else if (sortBy === "oldest") {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      } else if (sortBy === "risk-high") {
-        const riskOrder = { High: 3, Medium: 2, Low: 1 }
-        return riskOrder[b.riskLevel as keyof typeof riskOrder] - riskOrder[a.riskLevel as keyof typeof riskOrder]
-      } else if (sortBy === "risk-low") {
-        const riskOrder = { High: 3, Medium: 2, Low: 1 }
-        return riskOrder[a.riskLevel as keyof typeof riskOrder] - riskOrder[b.riskLevel as keyof typeof riskOrder]
+      // If file is uploaded, read its contents
+      if (activeTab === "upload" && file) {
+        textToAnalyze = await readFileAsText(file)
       }
-      return 0
+
+      // Call the API to analyze the contract with industry and region
+      const response = await fetch("/api/contracts/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: title || "Untitled Contract",
+          contractText: textToAnalyze,
+          industry,
+          region,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.message || "Failed to analyze contract")
+      }
+
+      const data = await response.json()
+
+      // Redirect to the contract details page
+      router.push(`/dashboard/contracts/${data.id}`)
+
+      toast({
+        title: "Analysis Complete",
+        description: "Your contract has been analyzed successfully.",
+      })
+    } catch (error: any) {
+      console.error("Error analyzing contract:", error)
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  // Helper function to read file contents
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (event) => resolve(event.target?.result as string)
+      reader.onerror = (error) => reject(error)
+      reader.readAsText(file)
     })
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">Contract History</h1>
-          <p className="text-neutral-500 mt-1">View and manage your analyzed contracts</p>
-        </div>
-        <Button
-          className="mt-4 md:mt-0 bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
-          onClick={() => router.push("/dashboard/contracts/new")}
-        >
-          <Plus className="h-4 w-4" /> Analyze New Contract
-        </Button>
-      </div>
+    <div className="container mx-auto px-4 py-8 max-w-3xl">
+      <h1 className="text-2xl font-bold mb-6">Analyze New Contract</h1>
 
-      <Card className="mb-8">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Filter Contracts</CardTitle>
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload Contract</CardTitle>
+          <CardDescription>
+            Paste your contract text or upload a document to analyze for potential issues.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
-              <Input
-                placeholder="Search contracts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+
+        <form onSubmit={handleSubmit}>
+          <CardContent>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-medium">
+                  Contract Title
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="E.g., Client Project Agreement"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full"
+                />
+                <p className="text-xs text-neutral-500">Give your contract a name for easy reference later.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="industry" className="text-sm font-medium">
+                      Industry
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-neutral-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-[200px] text-xs">
+                            Selecting your industry helps us provide more accurate and relevant contract analysis.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <IndustrySelector value={industry} onChange={setIndustry} />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="region" className="text-sm font-medium">
+                      Region
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-neutral-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-[200px] text-xs">
+                            We'll check for region-specific legal requirements and protections.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <RegionSelector value={region} onChange={setRegion} />
+                </div>
+              </div>
+
+              <Tabs defaultValue="paste" className="w-full" onValueChange={setActiveTab}>
+                <TabsList className="grid grid-cols-2 mb-6">
+                  <TabsTrigger value="paste" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> Paste Text
+                  </TabsTrigger>
+                  <TabsTrigger value="upload" className="flex items-center gap-2">
+                    <Upload className="h-4 w-4" /> Upload File
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="paste" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contract-text" className="text-sm font-medium">
+                      Contract Text
+                    </Label>
+                    <Textarea
+                      id="contract-text"
+                      placeholder="Paste your contract here..."
+                      value={contractText}
+                      onChange={(e) => setContractText(e.target.value)}
+                      className="min-h-[300px] font-mono text-sm"
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="upload" className="space-y-4">
+                  <div className="border-2 border-dashed border-neutral-300 rounded-lg p-8 text-center">
+                    <Upload className="h-10 w-10 text-neutral-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Upload Contract Document</h3>
+                    <p className="text-sm text-neutral-500 mb-4">Drag and drop your file here, or click to browse.</p>
+                    <input
+                      type="file"
+                      id="contract-file"
+                      accept=".doc,.docx,.pdf,.txt"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => document.getElementById("contract-file")?.click()}
+                      variant="outline"
+                      className="mx-auto"
+                    >
+                      Browse Files
+                    </Button>
+
+                    {file && (
+                      <div className="mt-4 bg-neutral-50 p-3 rounded-md flex items-center">
+                        <FileText className="h-5 w-5 text-primary mr-2" />
+                        <span className="text-sm font-medium truncate">{file.name}</span>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-neutral-500 mt-4">Supported file types: .PDF, .DOCX, .DOC, .TXT</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
+          </CardContent>
 
-            <Select value={riskFilter} onValueChange={setRiskFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by risk" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Risk Levels</SelectItem>
-                <SelectItem value="High">High Risk</SelectItem>
-                <SelectItem value="Medium">Medium Risk</SelectItem>
-                <SelectItem value="Low">Low Risk</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="risk-high">Highest Risk First</SelectItem>
-                <SelectItem value="risk-low">Lowest Risk First</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-neutral-600">Loading contracts...</p>
-        </div>
-      ) : filteredContracts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredContracts.map((contract) => (
-            <ContractCard
-              key={contract.id}
-              contract={contract}
-              onClick={() => router.push(`/dashboard/contracts/${contract.id}`)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <div className="mx-auto bg-neutral-100 h-16 w-16 rounded-full flex items-center justify-center mb-4">
-            <FileText className="h-8 w-8 text-neutral-500" />
-          </div>
-          <h3 className="text-lg font-medium mb-2">No contracts found</h3>
-          <p className="text-neutral-600 max-w-md mx-auto mb-6">
-            {searchQuery || riskFilter !== "all"
-              ? "Try adjusting your filters to see more results."
-              : "You haven't analyzed any contracts yet."}
-          </p>
-          {!searchQuery && riskFilter === "all" && (
-            <Button
-              className="bg-primary hover:bg-primary/90 text-white"
-              onClick={() => router.push("/dashboard/contracts/new")}
-            >
-              Analyze Your First Contract
+          <CardFooter className="flex justify-between border-t p-6">
+            <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isAnalyzing}>
+              Cancel
             </Button>
-          )}
-        </div>
-      )}
+            <Button
+              type="submit"
+              disabled={
+                isAnalyzing || (activeTab === "paste" && !contractText.trim()) || (activeTab === "upload" && !file)
+              }
+              className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>Analyze Contract</>
+              )}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   )
 }

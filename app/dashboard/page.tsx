@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Loader2, Plus } from "lucide-react"
+import { FileText, Loader2, Plus, FileCheck } from "lucide-react"
 import ContractCard from "@/components/contract-card"
 import ContractStats from "@/components/dashboard/contract-stats"
 import { useToast } from "@/hooks/use-toast"
@@ -15,6 +15,7 @@ interface Contract {
   createdAt: string
   riskLevel: "High" | "Medium" | "Low"
   issues: any[]
+  contractType?: string
 }
 
 export default function DashboardPage() {
@@ -77,12 +78,20 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-neutral-500 mt-1">Welcome back to ContractScan</p>
         </div>
-        <Button
-          className="mt-4 md:mt-0 bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
-          onClick={() => router.push("/dashboard/contracts/new")}
-        >
-          <Plus className="h-4 w-4" /> Analyze New Contract
-        </Button>
+        <div className="mt-4 md:mt-0 flex flex-col sm:flex-row gap-3">
+          <Button
+            className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
+            onClick={() => router.push("/dashboard/contracts/new")}
+          >
+            <Plus className="h-4 w-4" /> Analyze Contract
+          </Button>
+          <Button
+            className="bg-secondary hover:bg-secondary/90 text-white flex items-center gap-2"
+            onClick={() => router.push("/dashboard/contracts/generate")}
+          >
+            <FileCheck className="h-4 w-4" /> Generate Contract
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -145,18 +154,33 @@ export default function DashboardPage() {
               />
             ))}
 
-            <Card
-              className="border-2 border-dashed border-neutral-200 bg-transparent hover:bg-neutral-50 transition-colors cursor-pointer flex items-center justify-center p-6"
-              onClick={() => router.push("/dashboard/contracts/new")}
-            >
-              <div className="text-center">
-                <div className="mx-auto bg-neutral-100 h-12 w-12 rounded-full flex items-center justify-center mb-3">
-                  <FileText className="h-6 w-6 text-neutral-500" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:col-span-3">
+              <Card
+                className="border-2 border-dashed border-neutral-200 bg-transparent hover:bg-neutral-50 transition-colors cursor-pointer flex items-center justify-center p-6"
+                onClick={() => router.push("/dashboard/contracts/new")}
+              >
+                <div className="text-center">
+                  <div className="mx-auto bg-neutral-100 h-12 w-12 rounded-full flex items-center justify-center mb-3">
+                    <FileText className="h-6 w-6 text-neutral-500" />
+                  </div>
+                  <h3 className="font-medium mb-1">Analyze New Contract</h3>
+                  <p className="text-sm text-neutral-500">Upload or paste a contract</p>
                 </div>
-                <h3 className="font-medium mb-1">Analyze New Contract</h3>
-                <p className="text-sm text-neutral-500">Upload or paste a contract</p>
-              </div>
-            </Card>
+              </Card>
+
+              <Card
+                className="border-2 border-dashed border-neutral-200 bg-transparent hover:bg-neutral-50 transition-colors cursor-pointer flex items-center justify-center p-6"
+                onClick={() => router.push("/dashboard/contracts/generate")}
+              >
+                <div className="text-center">
+                  <div className="mx-auto bg-neutral-100 h-12 w-12 rounded-full flex items-center justify-center mb-3">
+                    <FileCheck className="h-6 w-6 text-neutral-500" />
+                  </div>
+                  <h3 className="font-medium mb-1">Generate New Contract</h3>
+                  <p className="text-sm text-neutral-500">Create a customized contract</p>
+                </div>
+              </Card>
+            </div>
           </div>
         ) : (
           <div className="text-center py-12 bg-white rounded-lg border">
@@ -165,14 +189,23 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-lg font-medium mb-2">No contracts yet</h3>
             <p className="text-neutral-600 max-w-md mx-auto mb-6">
-              Start by analyzing your first contract to get insights and suggestions.
+              Start by analyzing your first contract to get insights and suggestions, or generate a new contract from
+              scratch.
             </p>
-            <Button
-              className="bg-primary hover:bg-primary/90 text-white"
-              onClick={() => router.push("/dashboard/contracts/new")}
-            >
-              Analyze Your First Contract
-            </Button>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Button
+                className="bg-primary hover:bg-primary/90 text-white"
+                onClick={() => router.push("/dashboard/contracts/new")}
+              >
+                Analyze Your First Contract
+              </Button>
+              <Button
+                className="bg-secondary hover:bg-secondary/90 text-white"
+                onClick={() => router.push("/dashboard/contracts/generate")}
+              >
+                Generate a Contract
+              </Button>
+            </div>
           </div>
         )}
       </div>
