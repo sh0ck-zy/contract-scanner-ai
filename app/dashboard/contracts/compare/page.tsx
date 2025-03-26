@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,20 +23,19 @@ export default function CompareContractsPage() {
     const [revisedContractId, setRevisedContractId] = useState("")
     const [isLoadingContracts, setIsLoadingContracts] = useState(true)
 
-    // Fetch contracts (mock implementation)
-    useState(() => {
+    // Fetch contracts
+    useEffect(() => {
         const fetchContracts = async () => {
             try {
                 setIsLoadingContracts(true)
-                // In a real implementation, we would fetch contracts from the API
-                await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+                const response = await fetch("/api/contracts")
 
-                // Mock data
-                setContracts([
-                    { id: "1", title: "Client Project Agreement", createdAt: new Date().toISOString() },
-                    { id: "2", title: "Website Development Contract", createdAt: new Date().toISOString() },
-                    { id: "3", title: "Consulting Services Agreement", createdAt: new Date().toISOString() },
-                ])
+                if (!response.ok) {
+                    throw new Error("Failed to fetch contracts")
+                }
+
+                const data = await response.json()
+                setContracts(data)
             } catch (error) {
                 console.error("Error fetching contracts:", error)
                 toast({
@@ -74,11 +73,25 @@ export default function CompareContractsPage() {
         try {
             setIsLoading(true)
 
-            // In a real implementation, we would call the API to compare contracts
-            await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate API call
+            const response = await fetch("/api/contracts/compare", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    originalId: originalContractId,
+                    revisedId: revisedContractId,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error("Failed to compare contracts")
+            }
+
+            const data = await response.json()
 
             // Navigate to the comparison result page
-            router.push(`/dashboard/contracts/compare/result?original=${originalContractId}&revised=${revisedContractId}`)
+            router.push(`/dashboard/contracts/compare/result?id=${data.comparisonId}`)
         } catch (error) {
             console.error("Error comparing contracts:", error)
             toast({

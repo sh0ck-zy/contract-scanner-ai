@@ -9,43 +9,71 @@ datasource db {
 }
 
 model User {
-  id                 String    @id @default(uuid())
-  clerkId            String    @unique
-  email              String    @unique
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                 String               @id @default(uuid())
+  clerkId            String               @unique
+  email              String               @unique
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   stripeCustomerId   String?
-  subscriptionStatus String?   @default("FREE")
+  subscriptionStatus String?              @default("FREE")
   subscriptionId     String?
+  metadata           Json?                // For storing industry, region, referralCode, etc.
   contracts          Contract[]
+  referrals          Referral[]
+  contractComparisons ContractComparison[]
 }
 
 model Contract {
-  id                 String    @id @default(uuid())
+  id                 String               @id @default(uuid())
   userId             String
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   title              String
-  originalText       String    @db.Text
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  originalText       String               @db.Text
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   riskLevel          String?
   issues             Issue[]
-  contractType       String?   @default("ANALYZED") // ANALYZED or GENERATED
-  metadata           Json?     // For storing industry, region, etc.
-  recommendedActions String[]  @default([])
-  complianceFlags    String[]  @default([])
+  contractType       String?              @default("ANALYZED") // ANALYZED or GENERATED
+  metadata           Json?                // For storing industry, region, etc.
+  recommendedActions String[]             @default([])
+  complianceFlags    String[]             @default([])
+  originalComparisons ContractComparison[] @relation("OriginalContract")
+  revisedComparisons ContractComparison[] @relation("RevisedContract")
 }
 
 model Issue {
-  id                 String    @id @default(uuid())
+  id                 String               @id @default(uuid())
   contractId         String
-  contract           Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contract           Contract             @relation(fields: [contractId], references: [id], onDelete: Cascade)
   type               String
-  text               String    @db.Text
-  explanation        String    @db.Text
-  suggestion         String    @db.Text
-  severityScore      Int?      @default(5)
-  industryRelevance  String[]  @default([])
-  createdAt          DateTime  @default(now())
+  text               String               @db.Text
+  explanation        String               @db.Text
+  suggestion         String               @db.Text
+  severityScore      Int?                 @default(5)
+  industryRelevance  String[]             @default([])
+  createdAt          DateTime             @default(now())
+}
+
+model Referral {
+  id                 String               @id @default(uuid())
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email              String
+  status             String               // PENDING, COMPLETED, EXPIRED
+  referredUserId     String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+model ContractComparison {
+  id                 String               @id @default(uuid())
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalContractId String
+  originalContract   Contract             @relation("OriginalContract", fields: [originalContractId], references: [id], onDelete: Cascade)
+  revisedContractId  String
+  revisedContract    Contract             @relation("RevisedContract", fields: [revisedContractId], references: [id], onDelete: Cascade)
+  differences        Json
+  createdAt          DateTime             @default(now())
 }
 

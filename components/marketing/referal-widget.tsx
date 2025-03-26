@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,12 +14,42 @@ export function ReferralWidget() {
     const { toast } = useToast()
     const [email, setEmail] = useState("")
     const [isLoading, setIsLoading] = useState(false)
-    const [referralCode, setReferralCode] = useState("YOUR-UNIQUE-CODE")
-    const [referralLink, setReferralLink] = useState(
-        `${typeof window !== "undefined" ? window.location.origin : ""}/signup?ref=${referralCode}`,
-    )
+    const [isLoadingData, setIsLoadingData] = useState(true)
+    const [referralCode, setReferralCode] = useState("")
+    const [referralLink, setReferralLink] = useState("")
     const [referralCount, setReferralCount] = useState(0)
     const [creditsEarned, setCreditsEarned] = useState(0)
+
+    useEffect(() => {
+        const fetchReferralData = async () => {
+            try {
+                setIsLoadingData(true)
+                const response = await fetch("/api/referrals")
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch referral data")
+                }
+
+                const data = await response.json()
+
+                setReferralCode(data.referralCode)
+                setReferralLink(data.referralLink)
+                setReferralCount(data.stats.total)
+                setCreditsEarned(data.stats.creditsEarned)
+            } catch (error) {
+                console.error("Error fetching referral data:", error)
+                toast({
+                    title: "Error",
+                    description: "Failed to load referral data. Please try again.",
+                    variant: "destructive",
+                })
+            } finally {
+                setIsLoadingData(false)
+            }
+        }
+
+        fetchReferralData()
+    }, [toast])
 
     const handleSendInvite = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -45,8 +75,19 @@ export function ReferralWidget() {
         try {
             setIsLoading(true)
 
-            // In a real implementation, we would call the API to send the invitation
-            await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
+            const response = await fetch("/api/referrals", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ email }),
+            })
+
+            if (!response.ok) {
+                throw new Error("Failed to send invitation")
+            }
+
+            const data = await response.json()
 
             toast({
                 title: "Invitation Sent",
@@ -54,6 +95,9 @@ export function ReferralWidget() {
             })
 
             setEmail("")
+
+            // Update referral count
+            setReferralCount((prev) => prev + 1)
         } catch (error) {
             console.error("Error sending invitation:", error)
             toast({
@@ -72,6 +116,16 @@ export function ReferralWidget() {
             title: "Copied to Clipboard",
             description: "Your referral link has been copied to clipboard.",
         })
+    }
+
+    if (isLoadingData) {
+        return (
+            <Card>
+                <CardContent className="p-8 flex justify-center items-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </CardContent>
+            </Card>
+        )
     }
 
     return (

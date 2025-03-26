@@ -63,28 +63,31 @@ export function IndustryOnboarding() {
             setIsLoading(true)
 
             // In a real implementation, we would save the user preferences to the database
-            await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate API call
-
-            // Move to next step or complete onboarding
             if (step === 1) {
                 setStep(2)
-            } else {
-                // Save preferences and redirect to dashboard
-                await fetch("/api/user/preferences", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ industry, region }),
-                })
-
-                router.push("/dashboard")
-
-                toast({
-                    title: "Preferences saved",
-                    description: "Your industry and region preferences have been saved.",
-                })
+                setIsLoading(false)
+                return
             }
+
+            // Save preferences and redirect to dashboard
+            const response = await fetch("/api/user/preferences", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ industry, region }),
+            })
+
+            if (!response.ok) {
+                throw new Error("Failed to save preferences")
+            }
+
+            router.push("/dashboard")
+
+            toast({
+                title: "Preferences saved",
+                description: "Your industry and region preferences have been saved.",
+            })
         } catch (error) {
             console.error("Error saving preferences:", error)
             toast({
