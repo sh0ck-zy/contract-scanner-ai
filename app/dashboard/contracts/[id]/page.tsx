@@ -19,6 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { ComplianceAlerts } from "@/components/compliance-alerts"
 import { EducationalResources } from "@/components/educational-resources"
+import { ConfidenceScore } from "@/components/marketing/confidence-score"
 
 interface Issue {
   id: string
@@ -54,6 +55,7 @@ export default function ContractResultsPage({ params }: { params: { id: string }
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("issues")
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [confidenceScore, setConfidenceScore] = useState(0)
 
   // Fetch contract data
   useEffect(() => {
@@ -69,6 +71,20 @@ export default function ContractResultsPage({ params }: { params: { id: string }
 
         const data = await response.json()
         setContract(data)
+
+        // Calculate confidence score based on risk level and issues
+        let score = 0
+        if (data.riskLevel === "Low") score = 85
+        else if (data.riskLevel === "Medium") score = 65
+        else score = 45
+
+        // Adjust score based on number of issues
+        score -= Math.min(20, data.issues.length * 2)
+
+        // Ensure score is between 0 and 100
+        score = Math.max(0, Math.min(100, score))
+
+        setConfidenceScore(score)
       } catch (error) {
         console.error("Error fetching contract data:", error)
         toast({
@@ -282,6 +298,8 @@ export default function ContractResultsPage({ params }: { params: { id: string }
           {contract.complianceFlags && (
             <ComplianceAlerts complianceFlags={contract.complianceFlags} region={contract.metadata?.region || "US"} />
           )}
+
+          <ConfidenceScore score={confidenceScore} contractId={contract.id} contractTitle={contract.title} />
 
           <EducationalResources industry={contract.metadata?.industry || "general"} issueType={getMainIssueType()} />
         </div>
