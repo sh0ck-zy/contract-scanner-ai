@@ -1,6 +1,86 @@
-import { auth, currentUser } from "@clerk/nextjs/server"
-import prisma from "@/lib/db"
-import { errorResponse, successResponse } from "@/lib/api-utils"
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/lib/db";
+import { errorResponse, successResponse } from "@/lib/api-utils";
+import { Prisma } from "@prisma/client";
+
+type UserMetadata = {
+    industry?: string;
+    region?: string;
+    preferences?: any;
+};
+
+export async function GET(req: Request) {
+    try {
+        const { userId } = await auth();
+        if (!userId) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const user = await db.user.findUnique({
+            where: { clerkId: userId },
+            select: {
+                metadata: true,
+            },
+        });
+
+        if (!user) {
+            return new NextResponse("User not found", { status: 404 });
+        }
+
+        const metadata = (user.metadata as UserMetadata) || {};
+        return NextResponse.json(metadata);
+    } catch (error) {
+        console.error("[USER_PREFERENCES_GET]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
+
+export async function PATCH(req: Request) {
+    try {
+        const { userId } = await auth();
+        if (!userId) {
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
+
+        const body = await req.json();
+        const { industry, region, preferences } = body;
+
+        const user = await db.user.findUnique({
+            where: { clerkId: userId },
+            select: {
+                metadata: true,
+            },
+        });
+
+        if (!user) {
+            return new NextResponse("User not found", { status: 404 });
+        }
+
+        const currentMetadata = (user.metadata as UserMetadata) || {};
+        const updatedMetadata = {
+            ...currentMetadata,
+            industry,
+            region,
+            preferences,
+        };
+
+        const updatedUser = await db.user.update({
+            where: { clerkId: userId },
+            data: {
+                metadata: updatedMetadata as Prisma.JsonValue,
+            },
+            select: {
+                metadata: true,
+            },
+        });
+
+        return NextResponse.json(updatedUser.metadata || {});
+    } catch (error) {
+        console.error("[USER_PREFERENCES_PATCH]", error);
+        return new NextResponse("Internal Error", { status: 500 });
+    }
+}
 
 export async function POST(req: Request) {
     try {
@@ -20,13 +100,13 @@ export async function POST(req: Request) {
         }
 
         // Get or create DB user
-        let dbUser = await prisma.user.findUnique({
+        let dbUser = await db.user.findUnique({
             where: { clerkId: userId },
         })
 
         if (!dbUser) {
             // Create user in database
-            dbUser = await prisma.user.create({
+            dbUser = await db.user.create({
                 data: {
                     clerkId: userId,
                     email: user.emailAddresses[0].emailAddress,
@@ -35,7 +115,7 @@ export async function POST(req: Request) {
         }
 
         // Update user preferences
-        await prisma.user.update({
+        await db.user.update({
             where: { id: dbUser.id },
             data: {
                 metadata: {
@@ -49,35 +129,6 @@ export async function POST(req: Request) {
         return successResponse({ success: true })
     } catch (error) {
         console.error("Error saving user preferences:", error)
-        return errorResponse("Internal Server Error")
-    }
-}
-
-export async function GET(req: Request) {
-    try {
-        // Get authenticated user
-        const { userId } = auth()
-
-        if (!userId) {
-            return errorResponse("Unauthorized", 401)
-        }
-
-        // Get DB user
-        const dbUser = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        })
-
-        if (!dbUser) {
-            return errorResponse("User not found", 404)
-        }
-
-        // Return user preferences
-        return successResponse({
-            industry: (dbUser.metadata as any)?.industry || "general",
-            region: (dbUser.metadata as any)?.region || "US",
-        })
-    } catch (error) {
-        console.error("Error fetching user preferences:", error)
         return errorResponse("Internal Server Error")
     }
 }

@@ -1,94 +1,66 @@
-import { auth } from "@clerk/nextjs/server"
-import prisma from "@/lib/db"
-import { errorResponse, successResponse, validateRequiredFields } from "@/lib/api-utils"
-import { compareContracts } from "@/lib/ai/compare-contracts"
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/lib/db";
+import { compareContracts } from "@/lib/ai/compare-contracts";
 
 export async function POST(req: Request) {
     try {
-        // Get authenticated user
-        const { userId } = auth()
-
+        const { userId } = await auth();
         if (!userId) {
-            return errorResponse("Unauthorized", 401)
+            return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        // Get request body
-        const { originalId, revisedId } = await req.json()
+        const { originalText, revisedText } = await req.json();
 
-        const validationError = validateRequiredFields({ originalId, revisedId }, ["originalId", "revisedId"])
-        if (validationError) {
-            return errorResponse(validationError, 400)
+        if (!originalText || !revisedText) {
+            return new NextResponse("Both original and revised texts are required", { status: 400 });
         }
 
-        // Get DB user
-        const dbUser = await prisma.user.findUnique({
-            where: { clerkId: userId },
-            select: { id: true, subscriptionStatus: true },
-        })
+        const comparison = await compareContracts(originalText, revisedText);
 
-        if (!dbUser) {
-            return errorResponse("User not found", 404)
-        }
-
-        // Check if user has access to both contracts
-        const originalContract = await prisma.contract.findUnique({
-            where: {
-                id: originalId,
-                userId: dbUser.id,
-            },
-            select: {
-                id: true,
-                title: true,
-                originalText: true,
-            },
-        })
-
-        const revisedContract = await prisma.contract.findUnique({
-            where: {
-                id: revisedId,
-                userId: dbUser.id,
-            },
-            select: {
-                id: true,
-                title: true,
-                originalText: true,
-            },
-        })
-
-        if (!originalContract || !revisedContract) {
-            return errorResponse("One or both contracts not found", 404)
-        }
-
-        // Compare contracts
-        const comparisonResult = await compareContracts(originalContract.originalText, revisedContract.originalText)
-
-        // Save comparison to database
-        const comparison = await prisma.contractComparison.create({
+        // First create the original contract
+        const originalContract = await db.contract.create({
             data: {
-                userId: dbUser.id,
-                originalContractId: originalId,
-                revisedContractId: revisedId,
-                differences: comparisonResult,
+                userId,
+                title: "Original Contract",
+                originalText,
+                riskLevel: comparison.riskAssessment.originalRisk,
+                recommendedActions: comparison.riskAssessment.improvements,
+                complianceFlags: comparison.riskAssessment.concerns,
             },
-        })
+        });
 
-        return successResponse({
-            comparisonId: comparison.id,
-            originalContract: {
-                id: originalContract.id,
-                title: originalContract.title,
-                text: originalContract.originalText,
+        // Then create the revised contract
+        const revisedContract = await db.contract.create({
+            data: {
+                userId,
+                title: "Revised Contract",
+                originalText: revisedText,
+                riskLevel: comparison.riskAssessment.revisedRisk,
+                recommendedActions: comparison.riskAssessment.improvements,
+                complianceFlags: comparison.riskAssessment.concerns,
             },
-            revisedContract: {
-                id: revisedContract.id,
-                title: revisedContract.title,
-                text: revisedContract.originalText,
+        });
+
+        // Finally create the comparison
+        const contractComparison = await db.contractComparison.create({
+            data: {
+                userId,
+                originalContractId: originalContract.id,
+                revisedContractId: revisedContract.id,
+                differences: comparison.differences,
             },
-            differences: comparisonResult,
-        })
+        });
+
+        return NextResponse.json({
+            comparison: contractComparison,
+            originalContract,
+            revisedContract,
+            analysis: comparison,
+        });
     } catch (error) {
-        console.error("Error comparing contracts:", error)
-        return errorResponse("Internal Server Error")
+        console.error("[CONTRACT_COMPARE]", error);
+        return new NextResponse("Internal Error", { status: 500 });
     }
 }
 

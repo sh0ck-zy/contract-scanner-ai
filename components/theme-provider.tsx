@@ -11,7 +11,13 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   // Using suppressHydrationWarning to prevent hydration mismatches
   return (
-    <NextThemesProvider {...props} enableSystem={false} defaultTheme="light">
+    <NextThemesProvider 
+      {...props} 
+      enableSystem={true} 
+      attribute="class"
+      defaultTheme="light"
+      disableTransitionOnChange
+    >
       <div suppressHydrationWarning>{children}</div>
     </NextThemesProvider>
   )

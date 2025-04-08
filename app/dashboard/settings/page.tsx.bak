@@ -10,24 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, CreditCard, Lock, User, Loader2 } from "lucide-react"
+import { Bell, CreditCard, Lock, User } from "lucide-react"
+import { useUser } from "@clerk/nextjs"
 import { useToast } from "@/hooks/use-toast"
-
-// Mock user data for development
-const mockUser = {
-  fullName: "Test User",
-  firstName: "Test",
-  lastName: "User",
-  email: "test@example.com",
-  id: "user_123456789",
-  update: async (data: any) => {
-    console.log("Mock update user data:", data);
-    return Promise.resolve();
-  }
-};
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { user } = useUser()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [userProfile, setUserProfile] = useState({
@@ -42,54 +31,56 @@ export default function SettingsPage() {
   })
 
   useEffect(() => {
-    // Use mock user data in development
-    const user = mockUser;
-    
-    setUserProfile({
-      name: user.fullName || "",
-      email: user.email || "",
-    })
+    if (user) {
+      setUserProfile({
+        name: user.fullName || "",
+        email: user.primaryEmailAddress?.emailAddress || "",
+      })
 
-    // Using mock subscription data
-    setSubscription({
-      status: "active",
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      paymentMethod: {
-        card: {
-          last4: "4242",
-          exp_month: 12,
-          exp_year: 2024,
+      // In a real implementation, we would fetch subscription data from the API
+      // For now, we'll use mock data
+      setSubscription({
+        status: "active",
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        paymentMethod: {
+          card: {
+            last4: "4242",
+            exp_month: 12,
+            exp_year: 2024,
+          },
         },
-      },
-      invoices: [
-        {
-          id: "inv_123",
-          created: Date.now() / 1000 - 30 * 24 * 60 * 60,
-          amount_paid: 1500,
-          status: "paid",
-          hosted_invoice_url: "#",
-        },
-        {
-          id: "inv_456",
-          created: Date.now() / 1000 - 60 * 24 * 60 * 60,
-          amount_paid: 1500,
-          status: "paid",
-          hosted_invoice_url: "#",
-        },
-      ],
-    });
-  }, [])
+        invoices: [
+          {
+            id: "inv_123",
+            created: Date.now() / 1000 - 30 * 24 * 60 * 60,
+            amount_paid: 1500,
+            status: "paid",
+            hosted_invoice_url: "#",
+          },
+          {
+            id: "inv_456",
+            created: Date.now() / 1000 - 60 * 24 * 60 * 60,
+            amount_paid: 1500,
+            status: "paid",
+            hosted_invoice_url: "#",
+          },
+        ],
+      })
+    }
+  }, [user])
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      // Mock updating the user profile
-      await mockUser.update({
-        firstName: userProfile.name.split(" ")[0],
-        lastName: userProfile.name.split(" ").slice(1).join(" "),
-      });
+      // In a real implementation, we would update the user profile via Clerk
+      if (user) {
+        await user.update({
+          firstName: userProfile.name.split(" ")[0],
+          lastName: userProfile.name.split(" ").slice(1).join(" "),
+        })
+      }
 
       toast({
         title: "Profile updated",
@@ -111,13 +102,19 @@ export default function SettingsPage() {
     try {
       setIsLoading(true)
 
-      // Mock billing portal in development
-      toast({
-        title: "Development Mode",
-        description: "Billing portal would open here in production.",
+      // Call the API to create a billing portal session
+      const response = await fetch("/api/billing-portal", {
+        method: "POST",
       })
-      
-      setIsLoading(false)
+
+      if (!response.ok) {
+        throw new Error("Failed to create billing portal session")
+      }
+
+      const { url } = await response.json()
+
+      // Redirect to the billing portal
+      window.location.href = url
     } catch (error) {
       console.error("Error creating portal session:", error)
       toast({
@@ -125,20 +122,9 @@ export default function SettingsPage() {
         description: "Failed to access billing portal. Please try again.",
         variant: "destructive",
       })
+    } finally {
       setIsLoading(false)
     }
-  }
-
-  // Show loading skeleton while data loads
-  if (!userProfile.name) {
-    return (
-      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p>Loading settings...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -188,7 +174,7 @@ export default function SettingsPage() {
                     placeholder="your.email@example.com"
                   />
                   <p className="text-xs text-neutral-500">
-                    Email address can only be changed in your account settings.
+                    Email address can only be changed in your Clerk account settings.
                   </p>
                 </div>
               </CardContent>
@@ -333,17 +319,9 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <h3 className="font-medium">Password Management</h3>
-                <p className="text-neutral-600">Password management is handled through your account.</p>
-                <Button 
-                  className="bg-primary hover:bg-primary/90 text-white" 
-                  onClick={() => {
-                    toast({
-                      title: "Development Mode",
-                      description: "User profile would open here in production."
-                    });
-                  }}
-                >
-                  Open User Profile
+                <p className="text-neutral-600">Password management is handled through your Clerk account.</p>
+                <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => user?.openUserProfile()}>
+                  Open Clerk User Profile
                 </Button>
               </div>
 
@@ -437,5 +415,4 @@ export default function SettingsPage() {
       </Tabs>
     </div>
   )
-}
-
+} 

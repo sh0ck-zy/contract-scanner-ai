@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server"
 import { auth, currentUser } from "@clerk/nextjs/server"
-import prisma from "@/lib/db"
+import { db } from "@/lib/db"
 import { generateContract } from "@/lib/ai/generate-contract"
+import { Prisma } from "@prisma/client"
 
 export const runtime = "nodejs" // Explicitly set to nodejs runtime
 
 export async function POST(req: Request) {
     try {
         // Get authenticated user
-        const { userId } = auth()
+        const { userId } = await auth()
         const user = await currentUser()
 
         if (!userId || !user) {
@@ -16,13 +17,13 @@ export async function POST(req: Request) {
         }
 
         // Get DB user or create if it doesn't exist
-        let dbUser = await prisma.user.findUnique({
+        let dbUser = await db.user.findUnique({
             where: { clerkId: userId },
         })
 
         if (!dbUser) {
             // Create user in database
-            dbUser = await prisma.user.create({
+            dbUser = await db.user.create({
                 data: {
                     clerkId: userId,
                     email: user.emailAddresses[0].emailAddress,
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
             const contractText = await generateContract(contractRequirements)
 
             // Save to database
-            const contract = await prisma.contract.create({
+            const contract = await db.contract.create({
                 data: {
                     userId: dbUser.id,
                     title: contractRequirements.projectType + " Contract for " + contractRequirements.clientName,
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
                         industry: contractRequirements.industry,
                         region: contractRequirements.region,
                         projectType: contractRequirements.projectType,
-                    },
+                    } as Prisma.JsonValue,
                     contractType: "GENERATED",
                 },
             })

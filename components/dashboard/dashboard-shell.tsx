@@ -2,7 +2,7 @@
 
 import type React from "react"
 import Link from "next/link"
-import { redirect, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -14,19 +14,24 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { FileText, History, Home, Settings, Gift, Diff, FileCheck } from "lucide-react"
-import { useUser } from "@clerk/nextjs"
+
+// Mock user data for development
+const mockUser = {
+    firstName: "Test",
+    lastName: "User",
+    imageUrl: "",
+    email: "test@example.com",
+}
 
 export function DashboardShell({
     children,
 }: {
     children: React.ReactNode
 }) {
-    const { user, isLoaded } = useUser()
     const pathname = usePathname()
 
-    if (isLoaded && !user) {
-        redirect("/sign-in")
-    }
+    // Using mock user data in development
+    const user = mockUser
 
     const navItems = [
         {
@@ -117,7 +122,7 @@ export function DashboardShell({
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem asChild>
-                                    <Link href="/sign-out">Log Out</Link>
+                                    <Link href="/">Log Out</Link>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>

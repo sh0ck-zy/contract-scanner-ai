@@ -1,5 +1,7 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
-import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -10,30 +12,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { auth, currentUser } from "@clerk/nextjs/server"
-import { UserButton } from "@clerk/nextjs"
 import { NavLinks, MobileNavLinks } from "@/components/dashboard-nav"
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Check authentication first
-  const { userId } = auth();
-
-  if (!userId) {
-    redirect("/sign-in");
-  }
-
-  // Only fetch user details if authenticated
-  const user = await currentUser()
-
-  // Fallback user info in case Clerk data is missing
+  // Mock user info
   const userInfo = {
-    name: user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "User",
-    email: user?.emailAddresses[0]?.emailAddress || "",
-    imageUrl: user?.imageUrl || "",
+    name: "Demo User",
+    email: "user@example.com",
+    imageUrl: "",
   }
 
   return (
@@ -50,7 +40,29 @@ export default async function DashboardLayout({
           </div>
 
           <div className="flex items-center space-x-4">
-            <UserButton afterSignOutUrl="/" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 p-0">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={userInfo.imageUrl} alt={userInfo.name} />
+                    <AvatarFallback>{getInitials(userInfo.name)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{userInfo.name}</DropdownMenuLabel>
+                <DropdownMenuItem className="text-xs text-muted-foreground">
+                  {userInfo.email}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Link href="/dashboard/settings">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/">Sign out</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

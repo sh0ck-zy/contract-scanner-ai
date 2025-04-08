@@ -1,38 +1,27 @@
 // middleware.ts
 import { NextResponse } from "next/server";
-import { clerkMiddleware, ClerkMiddleware } from "@clerk/nextjs/server";
-import type { NextRequest } from "next/server";
+import { authMiddleware } from "@clerk/nextjs";
 
-// Initialize Clerk middleware
-const clerkAuth = clerkMiddleware();
-
-export default function middleware(request: NextRequest) {
-  // Apply Clerk middleware
-  const response = NextResponse.next();
-
-  // Let Clerk handle the request first
-  const clerkResponse = clerkAuth(request, response);
-
-  // Get the authenticated user (if any)
-  // Extract auth info from the request header after Clerk middleware processed it
-  const requestHeaders = new Headers(request.headers);
-  const userId = requestHeaders.get('x-clerk-user-id');
-
-  // If the user is trying to access a protected route and is not logged in
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !userId) {
-    const signInUrl = new URL('/sign-in', request.url);
-    signInUrl.searchParams.set('redirect_url', request.nextUrl.pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  return clerkResponse;
-}
+// This middleware handles authentication with Clerk
+export default authMiddleware({
+  // Routes that can be accessed without authentication
+  publicRoutes: [
+    "/",
+    "/api/webhook/clerk", 
+    "/api/webhook/stripe",
+    "/sign-in",
+    "/sign-up",
+    "/pricing",
+    "/api/auth/(.*)"
+  ],
+  
+  // Routes that are completely ignored by the middleware
+  ignoredRoutes: [
+    "/favicon.ico",
+    "/background.js"
+  ]
+});
 
 export const config = {
-  matcher: [
-    // Protect all dashboard routes
-    '/dashboard/:path*',
-    // Exclude static files and API routes that don't need auth
-    '/((?!api/|_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
 };

@@ -9,11 +9,11 @@ import { useToast } from "@/hooks/use-toast"
 
 interface ConfidenceScoreProps {
     score: number
-    contractId: string
-    contractTitle: string
+    issues: number
+    recommendations: number
 }
 
-export function ConfidenceScore({ score, contractId, contractTitle }: ConfidenceScoreProps) {
+export function ConfidenceScore({ score, issues, recommendations }: ConfidenceScoreProps) {
     const { toast } = useToast()
     const [showShareOptions, setShowShareOptions] = useState(false)
     const [copied, setCopied] = useState(false)
@@ -66,68 +66,27 @@ export function ConfidenceScore({ score, contractId, contractTitle }: Confidence
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" /> Contract Confidence Score
-                </CardTitle>
-                <CardDescription>How well your contract protects your freelance business</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="flex flex-col items-center">
-                    <div className="relative w-32 h-32 rounded-full border-8 border-neutral-100 flex items-center justify-center mb-4">
-                        <span className={`text-3xl font-bold ${getScoreColor()}`}>{score}</span>
-                        <span className="text-sm absolute bottom-1">out of 100</span>
+        <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Contract Confidence Score</h3>
+            <div className="space-y-4">
+                <div>
+                    <div className="flex justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Overall Score</span>
+                        <span className="text-sm font-medium">{score}%</span>
                     </div>
-                    <h3 className={`text-lg font-semibold ${getScoreColor()} mb-2`}>{getScoreText()}</h3>
-                    <Progress value={score} className={`w-full h-2 ${getProgressColor()}`} />
-
-                    <div className="mt-6 w-full space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Payment Protection</span>
-                            <span className="text-sm font-medium">{Math.min(100, score + 5)}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Scope Definition</span>
-                            <span className="text-sm font-medium">{Math.max(0, score - 10)}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Intellectual Property</span>
-                            <span className="text-sm font-medium">{Math.min(100, score + 15)}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Termination Terms</span>
-                            <span className="text-sm font-medium">{Math.max(0, score - 5)}%</span>
-                        </div>
+                    <Progress value={score} className="h-2" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <div className="text-sm font-medium">{issues}</div>
+                        <div className="text-xs text-muted-foreground">Issues Found</div>
+                    </div>
+                    <div>
+                        <div className="text-sm font-medium">{recommendations}</div>
+                        <div className="text-xs text-muted-foreground">Recommendations</div>
                     </div>
                 </div>
-            </CardContent>
-            <CardFooter className="flex flex-col border-t p-4">
-                <Button
-                    variant="outline"
-                    className="w-full flex items-center gap-2"
-                    onClick={() => setShowShareOptions(!showShareOptions)}
-                >
-                    <Share2 className="h-4 w-4" /> Share Your Score
-                </Button>
-
-                {showShareOptions && (
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={shareOnTwitter}>
-                            <Twitter className="h-4 w-4" /> Twitter
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={shareOnFacebook}>
-                            <Facebook className="h-4 w-4" /> Facebook
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={shareOnLinkedIn}>
-                            <Linkedin className="h-4 w-4" /> LinkedIn
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={copyToClipboard}>
-                            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Copy Link
-                        </Button>
-                    </div>
-                )}
-            </CardFooter>
+            </div>
         </Card>
     )
 }

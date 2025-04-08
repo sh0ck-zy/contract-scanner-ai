@@ -17,7 +17,7 @@ model User {
   stripeCustomerId   String?
   subscriptionStatus String?              @default("FREE")
   subscriptionId     String?
-  metadata           Json?                // For storing industry, region, referralCode, etc.
+  metadata           Json                 @default("{}")
   contracts          Contract[]
   referrals          Referral[]
   contractComparisons ContractComparison[]
@@ -33,10 +33,10 @@ model Contract {
   updatedAt          DateTime             @updatedAt
   riskLevel          String?
   issues             Issue[]
-  contractType       String?              @default("ANALYZED") // ANALYZED or GENERATED
-  metadata           Json?                // For storing industry, region, etc.
-  recommendedActions String[]             @default([])
-  complianceFlags    String[]             @default([])
+  contractType       String               @default("ANALYZED")
+  metadata           Json                 @default("{}")
+  recommendedActions Json                 @default("[]")
+  complianceFlags    Json                 @default("[]")
   originalComparisons ContractComparison[] @relation("OriginalContract")
   revisedComparisons ContractComparison[] @relation("RevisedContract")
 }
@@ -49,7 +49,7 @@ model Issue {
   text               String               @db.Text
   explanation        String               @db.Text
   suggestion         String               @db.Text
-  severityScore      Int?                 @default(5)
+  severityScore      Int                  @default(5)
   industryRelevance  String[]             @default([])
   createdAt          DateTime             @default(now())
 }
@@ -73,7 +73,7 @@ model ContractComparison {
   originalContract   Contract             @relation("OriginalContract", fields: [originalContractId], references: [id], onDelete: Cascade)
   revisedContractId  String
   revisedContract    Contract             @relation("RevisedContract", fields: [revisedContractId], references: [id], onDelete: Cascade)
-  differences        Json
+  differences        Json                 @default("{}")
   createdAt          DateTime             @default(now())
 }
 

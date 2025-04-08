@@ -2,18 +2,17 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useClerk } from "@clerk/nextjs"
 import { Loader2 } from "lucide-react"
 
 export default function SignOutPage() {
-    const { signOut } = useClerk()
     const router = useRouter()
 
     useEffect(() => {
-        signOut().then(() => {
+        // In development, just redirect to home page
+        setTimeout(() => {
             router.push("/")
-        })
-    }, [signOut, router])
+        }, 1000)
+    }, [router])
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-50">
