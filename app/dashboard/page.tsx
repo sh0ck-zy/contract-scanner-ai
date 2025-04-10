@@ -17,8 +17,13 @@ import {
   FileSearch,
   Clock,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  FileWarning,
+  Shield,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 interface Contract {
   id: string
@@ -26,6 +31,11 @@ interface Contract {
   createdAt: string
   riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
   type: string
+  issues?: Array<{
+    type: string
+    text: string
+    severityScore: number
+  }>
 }
 
 export default function DashboardPage() {
@@ -34,7 +44,13 @@ export default function DashboardPage() {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [recentContracts, setRecentContracts] = useState<Contract[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("all")
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [stats, setStats] = useState({
+    totalAnalyzed: 0,
+    highRiskCount: 0,
+    lowRiskCount: 0,
+    totalIssues: 0
+  })
 
   useEffect(() => {
     // Fetch contracts
@@ -44,8 +60,6 @@ export default function DashboardPage() {
         const response = await fetch("/api/contracts")
 
         if (!response.ok) {
-          // If the API returns an error, just set empty arrays
-          // This is likely the case for new users with no contracts
           console.warn("API returned non-OK status when fetching contracts:", response.status)
           setContracts([])
           setRecentContracts([])
@@ -53,16 +67,30 @@ export default function DashboardPage() {
         }
 
         const data = await response.json()
-        setContracts(data || [])
+        const contractList = data.contracts || []
+        setContracts(contractList)
         
-        // Get 3 most recent contracts
-        const sorted = [...(data || [])].sort((a, b) => 
+        // Get 5 most recent contracts for the carousel
+        const sorted = [...contractList].sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         )
-        setRecentContracts(sorted.slice(0, 3))
+        setRecentContracts(sorted.slice(0, 5))
+        
+        // Calculate stats
+        setStats({
+          totalAnalyzed: contractList.length,
+          highRiskCount: contractList.filter((c: Contract) => 
+            c.riskLevel === "HIGH" || c.riskLevel === "CRITICAL"
+          ).length,
+          lowRiskCount: contractList.filter((c: Contract) => 
+            c.riskLevel === "LOW"
+          ).length,
+          totalIssues: contractList.reduce((acc: number, contract: Contract) => 
+            acc + (contract.issues?.length || 0), 0
+          )
+        })
         
       } catch (error) {
-        // Handle network errors silently and just set empty arrays
         console.warn("Error fetching contracts:", error)
         setContracts([])
         setRecentContracts([])
@@ -72,7 +100,7 @@ export default function DashboardPage() {
     }
 
     fetchContracts()
-  }, [toast])
+  }, [])
 
   const getRiskBadge = (riskLevel: string) => {
     switch (riskLevel) {
@@ -95,7 +123,7 @@ export default function DashboardPage() {
           </Badge>
         )
       case "LOW":
-    return (
+        return (
           <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
             Low Risk
           </Badge>
@@ -105,58 +133,61 @@ export default function DashboardPage() {
     }
   }
 
-  const getRiskIcon = (riskLevel: string) => {
-    switch (riskLevel) {
-      case "CRITICAL":
-        return <AlertTriangle className="h-5 w-5 text-red-500" />
-      case "HIGH":
-        return <AlertTriangle className="h-5 w-5 text-amber-500" />
-      case "MEDIUM":
-        return <AlertTriangle className="h-5 w-5 text-amber-500" />
-      case "LOW":
-        return <CheckCircle className="h-5 w-5 text-emerald-500" />
-      default:
-        return null
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date)
+    } catch (e) {
+      return "Invalid Date"
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    }).format(date)
+  const nextSlide = () => {
+    setCurrentSlide((prev) => 
+      prev === recentContracts.length - 1 ? 0 : prev + 1
+    )
+  }
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => 
+      prev === 0 ? recentContracts.length - 1 : prev - 1
+    )
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
         <h1 className="text-3xl font-bold mb-4 sm:mb-0">Dashboard</h1>
-        <Button className="bg-primary hover:bg-primary/90 flex items-center gap-2">
-          <Link href="/dashboard/contracts/new">
-            <span className="flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" /> Analyze New Contract
-            </span>
+        <Button className="bg-primary hover:bg-primary/90">
+          <Link href="/dashboard/contracts/new" className="flex items-center gap-2">
+            <PlusCircle className="h-4 w-4" /> Analyze New Contract
           </Link>
-          </Button>
+        </Button>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card className="bg-primary/5 border-primary/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <FileSearch className="h-5 w-5 text-primary" /> Analysis
+              <FileSearch className="h-5 w-5 text-primary" /> Contract Analysis
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-2">
-            <p className="text-3xl font-bold">{contracts.length}</p>
-            <p className="text-sm text-slate-600">Contracts analyzed</p>
+            <p className="text-3xl font-bold">{stats.totalAnalyzed}</p>
+            <p className="text-sm text-slate-600">Total contracts analyzed</p>
+            <p className="text-sm text-slate-600 mt-1">{stats.totalIssues} issues identified</p>
           </CardContent>
           <CardFooter>
             <Button variant="ghost" size="sm" className="text-primary hover:text-primary/90 hover:bg-primary/10 p-0">
               <Link href="/dashboard/contracts" className="flex items-center gap-1">
-                View all <ArrowUpRight className="h-3.5 w-3.5" />
+                View history <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
           </CardFooter>
@@ -165,19 +196,18 @@ export default function DashboardPage() {
         <Card className="bg-amber-50 border-amber-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" /> Risks Found
+              <FileWarning className="h-5 w-5 text-amber-500" /> Risk Assessment
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-2">
-            <p className="text-3xl font-bold">
-              {contracts.filter(c => c.riskLevel === "HIGH" || c.riskLevel === "CRITICAL").length}
-            </p>
-            <p className="text-sm text-slate-600">High or critical risk contracts</p>
+            <p className="text-3xl font-bold">{stats.highRiskCount}</p>
+            <p className="text-sm text-slate-600">High/Critical risk contracts</p>
+            <p className="text-sm text-slate-600 mt-1">Require immediate attention</p>
           </CardContent>
           <CardFooter>
             <Button variant="ghost" size="sm" className="text-amber-700 hover:text-amber-800 hover:bg-amber-100 p-0">
               <Link href="/dashboard/contracts?risk=high" className="flex items-center gap-1">
-                Review issues <ArrowUpRight className="h-3.5 w-3.5" />
+                Review risks <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
           </CardFooter>
@@ -186,14 +216,13 @@ export default function DashboardPage() {
         <Card className="bg-emerald-50 border-emerald-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-emerald-500" /> Safe Contracts
+              <Shield className="h-5 w-5 text-emerald-500" /> Contract Health
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-2">
-            <p className="text-3xl font-bold">
-              {contracts.filter(c => c.riskLevel === "LOW").length}
-            </p>
+            <p className="text-3xl font-bold">{stats.lowRiskCount}</p>
             <p className="text-sm text-slate-600">Low risk contracts</p>
+            <p className="text-sm text-slate-600 mt-1">Meeting best practices</p>
           </CardContent>
           <CardFooter>
             <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 p-0">
@@ -205,151 +234,95 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Recent Activity Section */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
+        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+        
         {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-            <span>Loading your contracts...</span>
-          </div>
+          <Card className="p-8">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          </Card>
         ) : recentContracts.length === 0 ? (
-          <Card className="bg-slate-50 border-dashed border-2 border-slate-200">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-16 w-16 text-slate-300 mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Contracts Yet</h3>
-              <p className="text-slate-500 text-center max-w-md mb-6">
-                You haven't analyzed any contracts yet. Get started by analyzing your first contract.
+          <Card className="p-8">
+            <div className="text-center">
+              <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No Contracts Yet</h3>
+              <p className="text-slate-600 mb-4">
+                Start by analyzing your first contract to get insights and recommendations.
               </p>
-              <Button className="bg-primary hover:bg-primary/90">
-                <Link href="/dashboard/contracts/new" className="flex items-center gap-2">
-                  <PlusCircle className="h-4 w-4" /> Analyze Your First Contract
+              <Button asChild>
+                <Link href="/dashboard/contracts/new">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Analyze Your First Contract
                 </Link>
-          </Button>
-            </CardContent>
+              </Button>
+            </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {recentContracts.map((contract) => (
-              <Card 
-                key={contract.id}
-                className="hover:shadow-md transition-shadow cursor-pointer border-l-4"
-                style={{
-                  borderLeftColor: 
-                    contract.riskLevel === "CRITICAL" ? "#EF4444" : 
-                    contract.riskLevel === "HIGH" ? "#F59E0B" : 
-                    contract.riskLevel === "MEDIUM" ? "#F59E0B" : 
-                    "#10B981"
-                }}
-                onClick={() => router.push(`/dashboard/contracts/${contract.id}`)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold truncate">{contract.title}</CardTitle>
-                    {getRiskIcon(contract.riskLevel)}
-                  </div>
-                  <CardDescription>
-                    Analyzed on {formatDate(contract.createdAt)}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="bg-slate-50">
-                      {contract.type || "Service Contract"}
-                    </Badge>
-                    {getRiskBadge(contract.riskLevel)}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card className="relative">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium">Latest Contract Analysis</h3>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={prevSlide}
+                    disabled={recentContracts.length <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={nextSlide}
+                    disabled={recentContracts.length <= 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="overflow-hidden">
+                <div 
+                  className="transition-transform duration-300 ease-in-out"
+                  style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                >
+                  {recentContracts.map((contract, index) => (
+                    <div
+                      key={contract.id}
+                      className={cn(
+                        "w-full",
+                        index !== currentSlide && "hidden"
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{contract.title}</h4>
+                        {getRiskBadge(contract.riskLevel)}
+                      </div>
+                      <p className="text-sm text-slate-600 mb-4">
+                        Analyzed on {formatDate(contract.createdAt)}
+                      </p>
+                      <Button
+                        variant="outline"
+                        asChild
+                        className="w-full sm:w-auto"
+                      >
+                        <Link href={`/dashboard/contracts/${contract.id}`}>
+                          View Analysis
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
         )}
-      </div>
-
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Your Contracts</h2>
-        <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="bg-slate-100 p-1 rounded-lg mb-6">
-            <TabsTrigger value="all" className="data-[state=active]:bg-white rounded-md">All Contracts</TabsTrigger>
-            <TabsTrigger value="high_risk" className="data-[state=active]:bg-white rounded-md">High Risk</TabsTrigger>
-            <TabsTrigger value="low_risk" className="data-[state=active]:bg-white rounded-md">Low Risk</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all">
-            {renderContractList(contracts)}
-          </TabsContent>
-
-          <TabsContent value="high_risk">
-            {renderContractList(contracts.filter(c => c.riskLevel === "HIGH" || c.riskLevel === "CRITICAL"))}
-          </TabsContent>
-
-          <TabsContent value="low_risk">
-            {renderContractList(contracts.filter(c => c.riskLevel === "LOW"))}
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   )
-
-  function renderContractList(contractList: Contract[]) {
-    if (isLoading) {
-      return (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-          <span>Loading your contracts...</span>
-        </div>
-      )
-    }
-
-    if (contractList.length === 0) {
-      return (
-        <div className="bg-slate-50 rounded-lg p-8 text-center border border-slate-200">
-          <p className="text-slate-600">No contracts found in this category.</p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="overflow-hidden rounded-lg border border-slate-200">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-100">
-                <th className="px-4 py-3 text-left font-medium text-slate-600">Contract Name</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">Date</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">Type</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-600">Risk Level</th>
-                <th className="px-4 py-3 text-right font-medium text-slate-600"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {contractList.map((contract, index) => (
-                <tr 
-                  key={contract.id} 
-                  className={`hover:bg-slate-50 border-t border-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
-                >
-                  <td className="px-4 py-3 font-medium">{contract.title}</td>
-                  <td className="px-4 py-3 text-slate-600">{formatDate(contract.createdAt)}</td>
-                  <td className="px-4 py-3 text-slate-600">{contract.type || "Service Contract"}</td>
-                  <td className="px-4 py-3">
-                    {getRiskBadge(contract.riskLevel)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-primary"
-                      onClick={() => router.push(`/dashboard/contracts/${contract.id}`)}
-                    >
-                      View Details
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
 }
 
