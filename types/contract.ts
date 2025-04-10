@@ -9,6 +9,7 @@ export interface ContractIssue {
   suggestion: string
   severity: ContractSeverity
   metadata?: Record<string, any>
+  severityScore?: number
 }
 
 export interface ContractAnalysis {

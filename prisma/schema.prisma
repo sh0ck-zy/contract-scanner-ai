@@ -1,79 +1,92 @@
-// This is your Prisma schema file
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id                 String               @id @default(uuid())
-  clerkId            String               @unique
-  email              String               @unique
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  stripeCustomerId   String?
-  subscriptionStatus String?              @default("FREE")
-  subscriptionId     String?
-  metadata           Json                 @default("{}")
-  contracts          Contract[]
-  referrals          Referral[]
+  id                String    @id @default(cuid())
+  clerkId           String    @unique
+  email             String    @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  stripeCustomerId  String?
+  subscriptionStatus String?
+  subscriptionId    String?
+  role              String    @default("user")
+  metadata          String    @default("{}")
+  contracts         Contract[]
+  referrals         Referral[]
   contractComparisons ContractComparison[]
 }
 
+model SystemSettings {
+  id              String   @id @default("1")
+  maxFileSize     Int      @default(10)
+  allowedFileTypes String  @default(".pdf,.doc,.docx")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 model Contract {
-  id                 String               @id @default(uuid())
-  userId             String
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title              String
-  originalText       String               @db.Text
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  riskLevel          String?
-  issues             Issue[]
-  contractType       String               @default("ANALYZED")
-  metadata           Json                 @default("{}")
-  recommendedActions Json                 @default("[]")
-  complianceFlags    Json                 @default("[]")
-  originalComparisons ContractComparison[] @relation("OriginalContract")
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  originalText      String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  riskLevel         String?
+  contractType      String    @default("ANALYZED")
+  metadata          String    @default("{}")
+  recommendedActions String    @default("[]")
+  complianceFlags   String    @default("[]")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issues            Issue[]
+  comparisons       ContractComparison[] @relation("OriginalContract")
   revisedComparisons ContractComparison[] @relation("RevisedContract")
 }
 
 model Issue {
-  id                 String               @id @default(uuid())
-  contractId         String
-  contract           Contract             @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  type               String
-  text               String               @db.Text
-  explanation        String               @db.Text
-  suggestion         String               @db.Text
-  severityScore      Int                  @default(5)
-  industryRelevance  String[]             @default([])
-  createdAt          DateTime             @default(now())
+  id                String    @id @default(cuid())
+  contractId        String
+  type              String
+  text              String
+  explanation       String
+  suggestion        String
+  severityScore     Int       @default(5)
+  industryRelevance String    @default("[]")
+  createdAt         DateTime  @default(now())
+  metadata          String    @default("{}")
+  severity          String    @default("MEDIUM")
+  contract          Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
 }
 
 model Referral {
-  id                 String               @id @default(uuid())
-  userId             String
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  email              String
-  status             String               // PENDING, COMPLETED, EXPIRED
-  referredUserId     String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  email           String
+  status          String
+  referredUserId  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ContractComparison {
-  id                 String               @id @default(uuid())
-  userId             String
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  userId            String
   originalContractId String
-  originalContract   Contract             @relation("OriginalContract", fields: [originalContractId], references: [id], onDelete: Cascade)
-  revisedContractId  String
-  revisedContract    Contract             @relation("RevisedContract", fields: [revisedContractId], references: [id], onDelete: Cascade)
-  differences        Json                 @default("{}")
-  createdAt          DateTime             @default(now())
+  revisedContractId String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalContract  Contract  @relation("OriginalContract", fields: [originalContractId], references: [id], onDelete: Cascade)
+  revisedContract   Contract  @relation("RevisedContract", fields: [revisedContractId], references: [id], onDelete: Cascade)
 }
 

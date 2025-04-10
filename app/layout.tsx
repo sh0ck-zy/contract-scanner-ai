@@ -1,5 +1,5 @@
-import type { Metadata } from "next"
 import "@/styles/globals.css"
+import type { Metadata } from "next"
 import { Inter, Merriweather } from "next/font/google"
 import { Toaster } from "@/components/ui/toaster"
 import { Analytics } from "../components/analytics"
@@ -11,7 +11,7 @@ const inter = Inter({
   variable: "--font-inter",
 })
 
-const merriweather = Merriweather({ 
+const merriweather = Merriweather({
   subsets: ["latin"],
   weight: ["300", "400", "700", "900"],
   variable: "--font-merriweather",

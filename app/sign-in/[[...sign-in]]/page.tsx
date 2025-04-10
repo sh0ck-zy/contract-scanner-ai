@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@clerk/nextjs"
 
 export default async function SignInPage() {
-    const { userId } = auth()
+    const { userId } = await auth()
     
     if (userId) {
         redirect("/dashboard")

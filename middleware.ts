@@ -2,26 +2,31 @@
 import { NextResponse } from "next/server";
 import { authMiddleware } from "@clerk/nextjs";
 
-// This middleware handles authentication with Clerk
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  "/",
+  "/api/webhook/clerk", 
+  "/api/webhook/stripe",
+  "/sign-in",
+  "/sign-up",
+  "/pricing",
+  "/api/auth/(.*)"
+];
+
+// Routes to ignore
+const IGNORED_ROUTES = [
+  "/favicon.ico",
+  "/background.js"
+];
+
+// Use Clerk in both development and production
 export default authMiddleware({
-  // Routes that can be accessed without authentication
-  publicRoutes: [
-    "/",
-    "/api/webhook/clerk", 
-    "/api/webhook/stripe",
-    "/sign-in",
-    "/sign-up",
-    "/pricing",
-    "/api/auth/(.*)"
-  ],
-  
-  // Routes that are completely ignored by the middleware
-  ignoredRoutes: [
-    "/favicon.ico",
-    "/background.js"
-  ]
+  publicRoutes: PUBLIC_ROUTES,
+  ignoredRoutes: IGNORED_ROUTES,
+  debug: process.env.NODE_ENV === 'development',
 });
 
+// Stop Middleware running on static files
 export const config = {
   matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
 };

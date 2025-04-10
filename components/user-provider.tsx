@@ -1,16 +1,21 @@
 "use client"
 
 import React from "react"
+import { ClerkProvider } from "@clerk/nextjs"
 
-// Simple development user provider that just renders children
+// Use Clerk for authentication
 export function UserProvider({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative">
+    <ClerkProvider
+      appearance={{
+        elements: {
+          footer: "hidden" // Hide Clerk's footer
+        }
+      }}
+      // Setting this ensures Clerk works in development
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
       {children}
-      {/* Development mode notification */}
-      <div className="fixed bottom-0 left-0 right-0 bg-amber-100 border-t border-amber-300 p-2 text-xs text-amber-800 text-center">
-        Running in development mode without authentication
-      </div>
-    </div>
+    </ClerkProvider>
   )
 } 

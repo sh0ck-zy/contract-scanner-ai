@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { FloatingCTA } from "@/components/floating-cta"
 
+// This page doesn't require authentication
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -232,7 +233,7 @@ export default function LandingPage() {
                 title="Get Actionable Insights"
                 description="Receive a detailed report with explanations and suggestions for improvement."
               />
-            </div>
+                </div>
             
             <div className="mt-12 text-center">
               <Button size="lg" className="bg-primary hover:bg-primary/90 shadow-md">
@@ -253,7 +254,7 @@ export default function LandingPage() {
                 Join thousands of freelancers who protect their business with ContractScan
               </p>
             </div>
-            
+
             {/* Usage statistics with animated counters */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
               <StatCard 
@@ -276,7 +277,7 @@ export default function LandingPage() {
                 label="Client Satisfaction" 
                 icon={<Star className="h-6 w-6 text-warning" />} 
               />
-                </div>
+            </div>
             
             {/* Testimonial cards */}
             <div className="grid md:grid-cols-3 gap-8">

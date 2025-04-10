@@ -16,14 +16,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  skipMiddlewareUrlNormalize: true,
+  skipTrailingSlashRedirect: true,
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
-  },
-  middleware: {
-    skipMiddlewareUrlNormalize: true,
-    skipTrailingSlashRedirect: true,
   },
 }
 

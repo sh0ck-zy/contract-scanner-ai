@@ -1,146 +1,205 @@
-import { NextResponse } from "next/server"
-import { auth, currentUser } from "@clerk/nextjs/server"
+import { NextRequest, NextResponse } from "next/server"
+import { auth, currentUser } from "@clerk/nextjs"
 import { db } from "@/lib/db"
 import { analyzeContractAdvanced } from "@/lib/ai/analyze-contract-enhanced"
-import { sendAnalysisCompletionEmail } from "@/lib/email"
+// import { sendAnalysisCompletionEmail } from "@/lib/email"
 
-export const runtime = "nodejs" // Explicitly set to nodejs runtime
+export const config = {
+  runtime: "nodejs"
+}
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // Get authenticated user
-    const { userId } = auth()
-    const user = await currentUser()
+    console.log("[CONTRACT_ANALYSIS] Starting analysis process")
+    
+    // Get user data from Clerk
+    const { userId } = await auth();
+    const user = await currentUser();
 
     if (!userId || !user) {
+      console.log("[CONTRACT_ANALYSIS] Unauthorized access attempt")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get DB user or create if it doesn't exist
-    let dbUser = await db.user.findUnique({
-      where: { clerkId: userId },
-    })
-
-    if (!dbUser) {
-      // Create user in database
-      dbUser = await db.user.create({
-        data: {
+    const { text, title, freelancerType, industry, region } = await req.json()
+    
+    if (!text) {
+      console.log("[CONTRACT_ANALYSIS] No text provided")
+      return NextResponse.json({ error: "No text provided" }, { status: 400 })
+    }
+    
+    console.log(`[CONTRACT_ANALYSIS] Analyzing contract: ${title}, freelancer type: ${freelancerType}, industry: ${industry}, region: ${region}`)
+    
+    // Analyze the contract with AI
+    let analysis;
+    try {
+      analysis = await analyzeContractAdvanced(text, {
+        industry,
+        region,
+      });
+      console.log("[CONTRACT_ANALYSIS] Contract analyzed successfully");
+    } catch (error) {
+      console.error("[CONTRACT_ANALYSIS] Analysis error:", error);
+      return NextResponse.json({ 
+        error: "Failed to analyze contract",
+        details: error instanceof Error ? error.message : "Unknown error"
+      }, { status: 500 });
+    }
+    
+    // Save contract to the database
+    let contract;
+    try {
+      // Get or create user in database
+      const dbUser = await db.user.upsert({
+        where: { clerkId: userId },
+        update: {},
+        create: {
           clerkId: userId,
           email: user.emailAddresses[0].emailAddress,
-          subscriptionStatus: "FREE", // Set initial subscription status
-        },
-      })
-    }
-
-    // Check subscription
-    if (dbUser.subscriptionStatus !== "ACTIVE" && dbUser.subscriptionStatus !== "TRIAL" && dbUser.subscriptionStatus !== "FREE") {
-      return NextResponse.json({ error: "Invalid subscription status" }, { status: 403 })
-    }
-
-    // For free users, check usage limits
-    if (dbUser.subscriptionStatus === "FREE") {
-      const analysisCount = await db.contract.count({
-        where: { userId: dbUser.id },
-      })
-
-      if (analysisCount >= 3) {
-        return NextResponse.json({ error: "Free trial limit reached. Please upgrade to continue." }, { status: 403 })
-      }
-    }
-
-    // Get and validate contract data from request
-    let body;
-    try {
-      body = await req.json()
-    } catch (error) {
-      console.error("Error parsing request body:", error)
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
-    }
-
-    const { contractText, title, industry, region } = body
-
-    if (!contractText) {
-      return NextResponse.json({ error: "Contract text is required" }, { status: 400 })
-    }
-
-    if (contractText.length > 50000) {
-      return NextResponse.json({ error: "Contract text is too long. Maximum length is 50,000 characters." }, { status: 400 })
-    }
-
-    // Validate OpenAI API key
-    if (!process.env.OPENAI_API_KEY) {
-      console.error("OpenAI API key is not configured")
-      return NextResponse.json({ error: "OpenAI API key is not configured" }, { status: 500 })
-    }
-
-    // Analyze contract using OpenAI with industry-specific model
-    let analysis
-    try {
-      analysis = await analyzeContractAdvanced(contractText, industry || "general", region || "US")
-
-      if (!analysis || !analysis.issues || !analysis.riskLevel) {
-        throw new Error("Invalid analysis result from AI")
-      }
-
-      // Save to database with enhanced schema
-      const contract = await db.contract.create({
+          subscriptionStatus: "FREE"
+        }
+      });
+      
+      console.log(`[CONTRACT_ANALYSIS] User ${dbUser.id} found/created`);
+      
+      // Create contract with analysis results
+      contract = await db.contract.create({
         data: {
           userId: dbUser.id,
-          title: title || "Untitled Contract",
-          originalText: contractText,
+          title,
+          originalText: text,
           riskLevel: analysis.riskLevel,
-          metadata: {
-            industry: industry || "general",
-            region: region || "US",
-            industrySpecificRisk: analysis.industryRelevance,
-            analyzedAt: new Date().toISOString(),
-          },
+          contractType: analysis.contractType,
+          recommendedActions: analysis.recommendedActions,
+          complianceFlags: analysis.complianceFlags,
           issues: {
-            create: analysis.issues.map((issue) => ({
+            create: analysis.issues.map(issue => ({
               type: issue.type,
               text: issue.text,
               explanation: issue.explanation,
               suggestion: issue.suggestion,
               severityScore: issue.severityScore,
-              industryRelevance: issue.industryRelevance,
-            })),
-          },
-          recommendedActions: analysis.recommendedActions || [],
-          complianceFlags: analysis.complianceFlags || [],
+              industryRelevance: issue.industryRelevance
+            }))
+          }
         },
         include: {
-          issues: true,
-        },
-      })
-
-      // Send email notification
-      try {
-        if (user.emailAddresses && user.emailAddresses.length > 0) {
-          await sendAnalysisCompletionEmail(
-            user.emailAddresses[0].emailAddress,
-            contract.title,
-            contract.id,
-            contract.riskLevel || "Unknown",
-            contract.issues.length,
-          )
+          issues: true
         }
-      } catch (emailError) {
-        console.error("Error sending email notification:", emailError)
-        // Don't fail the request if email fails
-      }
-
-      return NextResponse.json(contract)
+      });
+      
+      console.log(`[CONTRACT_ANALYSIS] Contract ${contract.id} saved successfully`);
+      
+      return NextResponse.json({
+        success: true,
+        contract: {
+          id: contract.id,
+          title: contract.title,
+          riskLevel: contract.riskLevel,
+          contractType: contract.contractType,
+          issues: contract.issues,
+          createdAt: contract.createdAt
+        }
+      });
     } catch (error) {
-      console.error("Error in OpenAI analysis:", error)
+      console.error("[CONTRACT_ANALYSIS] Database error:", error);
       return NextResponse.json({ 
-        error: error instanceof Error ? error.message : "AI analysis failed"
-      }, { status: 500 })
+        error: "Error saving contract",
+        details: error instanceof Error ? error.message : "Unknown error"
+      }, { status: 500 });
     }
-  } catch (error) {
-    console.error("Error analyzing contract:", error)
+  } catch (error: any) {
+    console.error("[CONTRACT_ANALYSIS] Unexpected error:", error);
     return NextResponse.json({ 
-      error: error instanceof Error ? error.message : "Internal Server Error"
-    }, { status: 500 })
+      error: "Server error",
+      details: error.message || "Unknown error"
+    }, { status: 500 });
   }
+}
+
+// Função para gerar uma análise simulada para desenvolvimento
+function generateMockAnalysis(contractText: string, freelancerType: string = "general") {
+  // Detectar problemas comuns baseados em palavras-chave
+  const hasPaymentIssue = contractText.toLowerCase().includes("payment") || Math.random() > 0.7;
+  const hasDeadlineIssue = contractText.toLowerCase().includes("deadline") || Math.random() > 0.7;
+  const hasIntellectualPropertyIssue = contractText.toLowerCase().includes("intellectual property") || Math.random() > 0.7;
+  const hasLiabilityIssue = contractText.toLowerCase().includes("liability") || Math.random() > 0.7;
+  
+  // Calcular nível de risco baseado no número de questões detectadas
+  const issuesCount = [hasPaymentIssue, hasDeadlineIssue, hasIntellectualPropertyIssue, hasLiabilityIssue].filter(Boolean).length;
+  const riskLevel = issuesCount <= 1 ? "LOW" : issuesCount <= 2 ? "MEDIUM" : "HIGH";
+  
+  // Gerar issues baseadas em palavras-chave
+  const issues = [];
+  
+  if (hasPaymentIssue) {
+    issues.push({
+      type: "PAYMENT",
+      text: "Payment terms are not clearly defined",
+      explanation: "The contract does not specify clear payment deadlines or consequences for late payments.",
+      suggestion: "Add specific payment terms including amounts, deadlines, and consequences for late payments.",
+      severity: "HIGH",
+      severityScore: 8
+    });
+  }
+  
+  if (hasDeadlineIssue) {
+    issues.push({
+      type: "DEADLINE",
+      text: "Project deadlines are vague",
+      explanation: "The contract does not have specific project milestones or completion dates.",
+      suggestion: "Include specific deadlines for each project phase and the final deliverable.",
+      severity: "MEDIUM",
+      severityScore: 5
+    });
+  }
+  
+  if (hasIntellectualPropertyIssue) {
+    issues.push({
+      type: "INTELLECTUAL_PROPERTY",
+      text: "Intellectual property rights are not clearly assigned",
+      explanation: "The contract is unclear about who owns the intellectual property created during the project.",
+      suggestion: "Explicitly state that you retain ownership of your work until final payment is received.",
+      severity: "HIGH",
+      severityScore: 9
+    });
+  }
+  
+  if (hasLiabilityIssue) {
+    issues.push({
+      type: "LIABILITY",
+      text: "Unlimited liability clause",
+      explanation: "The contract has an unlimited liability clause that puts you at financial risk.",
+      suggestion: "Add a liability cap that limits your financial exposure to the value of the contract.",
+      severity: "HIGH",
+      severityScore: 10
+    });
+  }
+  
+  // Se não encontramos nenhum problema, adicione um genérico
+  if (issues.length === 0) {
+    issues.push({
+      type: "GENERAL",
+      text: "Contract is too vague",
+      explanation: "The contract doesn't have enough specific details about the work to be performed.",
+      suggestion: "Add more detailed scope of work with specific deliverables and acceptance criteria.",
+      severity: "MEDIUM",
+      severityScore: 6
+    });
+  }
+  
+  // Adicionar ações recomendadas baseadas nas issues
+  const recommendedActions = issues.map(issue => 
+    `Review ${issue.type.toLowerCase()} terms: ${issue.suggestion}`
+  );
+  
+  // Retornar a análise completa
+  return {
+    riskLevel,
+    type: "FREELANCE",
+    issues,
+    recommendedActions,
+    complianceFlags: []
+  };
 }
 

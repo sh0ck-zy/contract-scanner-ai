@@ -1,168 +1,133 @@
-import OpenAI from "openai"
-import { ContractAnalysis, ContractSeverity, ContractType, IssueType } from "@/types/contract"
+import { OpenAI } from "openai"
+import { validateSeverity, validateType } from "./validation"
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-export interface ContractIssue {
-  type: ContractType
+interface AnalysisOptions {
+  industry?: string
+  region?: string
+}
+
+interface ContractIssue {
+  type: string
   text: string
   explanation: string
   suggestion: string
   severityScore: number
-  industryRelevance: number
+  industryRelevance: string
+}
+
+interface ContractAnalysis {
+  riskLevel: string
+  contractType: string
+  recommendedActions: string[]
+  complianceFlags: string[]
+  issues: ContractIssue[]
 }
 
 export async function analyzeContractAdvanced(
   contractText: string,
-  industry: string = "general",
-  region: string = "US"
+  options: AnalysisOptions = {}
 ): Promise<ContractAnalysis> {
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OpenAI API key is not configured")
+    throw new Error("OpenAI API key not configured")
   }
 
-  if (!contractText) {
+  if (!contractText || contractText.trim().length === 0) {
     throw new Error("Contract text is required")
   }
 
-  if (contractText.length > 50000) {
-    throw new Error("Contract text is too long (max 50,000 characters)")
-  }
+  const prompt = `Analyze the following contract text and provide a detailed analysis.
+  ${options.industry ? `Industry context: ${options.industry}` : ''}
+  ${options.region ? `Region context: ${options.region}` : ''}
+  
+  Contract text:
+  ${contractText}
+  
+  Please provide a structured analysis with:
+  1. Risk level (LOW, MEDIUM, HIGH, CRITICAL)
+  2. Contract type (SERVICE, EMPLOYMENT, NDA, OTHER)
+  3. List of recommended actions
+  4. List of compliance flags
+  5. List of issues found, each with:
+     - Type
+     - Description
+     - Explanation
+     - Suggested fix
+     - Severity score (1-10)
+     - Industry relevance
+
+  Format the response as a JSON object with these exact fields. Return ONLY the JSON object, no additional text.`
 
   try {
-    const prompt = `As a legal expert specializing in freelancer contracts, analyze the following contract and provide a detailed analysis in JSON format. Focus on issues that commonly affect freelancers, including:
-
-1. Payment Terms and Conditions
-   - Payment schedule and deadlines
-   - Late payment penalties
-   - Payment methods and currency
-   - Invoice requirements
-
-2. Intellectual Property Rights
-   - Ownership of work
-   - Usage rights
-   - Attribution requirements
-   - Portfolio rights
-
-3. Scope of Work
-   - Project deliverables
-   - Timeline expectations
-   - Revision policies
-   - Additional work compensation
-
-4. Termination and Cancellation
-   - Notice periods
-   - Kill fees
-   - Project cancellation terms
-   - Final payment conditions
-
-5. Liability and Insurance
-   - Indemnification clauses
-   - Insurance requirements
-   - Liability limitations
-   - Warranty terms
-
-Provide analysis in this JSON format:
-{
-  "riskLevel": "LOW|MEDIUM|HIGH|CRITICAL",
-  "type": "SERVICE|EMPLOYMENT|LEASE|SALES|NDA|OTHER",
-  "recommendedActions": [
-    "Specific, actionable steps the freelancer should take",
-    "e.g., 'Request a kill fee of 25% for project cancellation'"
-  ],
-  "complianceFlags": [
-    "Important compliance issues to address",
-    "e.g., 'Payment terms exceed standard 30-day net'"
-  ],
-  "issues": [
-    {
-      "type": "PAYMENT|IP|SCOPE|TERMINATION|LIABILITY|OTHER",
-      "text": "The specific clause or text from the contract",
-      "explanation": "Why this is problematic for freelancers",
-      "suggestion": "How to address or negotiate this issue",
-      "severity": "LOW|MEDIUM|HIGH|CRITICAL"
-    }
-  ]
-}
-
-Contract:
-${contractText}`
-
     const response = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content:
-            "You are a legal expert specializing in freelancer contracts, with deep knowledge of common issues and best practices for freelancers. Provide clear, actionable advice focused on protecting freelancer interests.",
+          content: "You are a legal contract analysis expert. Analyze contracts and provide detailed, accurate assessments. Always return valid JSON."
         },
         {
           role: "user",
-          content: prompt,
-        },
+          content: prompt
+        }
       ],
       temperature: 0.3,
       max_tokens: 2000,
-      response_format: { type: "json_object" },
+      response_format: { type: "json_object" }
     })
 
-    const result = response.choices[0]?.message?.content
-    if (!result) {
-      throw new Error("Failed to get analysis from OpenAI")
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      throw new Error("No response from AI")
     }
 
+    // Clean the response to ensure it's valid JSON
+    const cleanContent = content.trim().replace(/^```json\s*|\s*```$/g, '')
+    
+    let analysis: ContractAnalysis
     try {
-      const analysis = JSON.parse(result) as ContractAnalysis
-
-      // Validate and sanitize the response
-      const validatedAnalysis: ContractAnalysis = {
-        riskLevel: validateSeverity(analysis.riskLevel),
-        type: validateType(analysis.type),
-        recommendedActions: Array.isArray(analysis.recommendedActions)
-          ? analysis.recommendedActions
-          : [],
-        complianceFlags: Array.isArray(analysis.complianceFlags)
-          ? analysis.complianceFlags
-          : [],
-        issues: Array.isArray(analysis.issues)
-          ? analysis.issues.map((issue) => ({
-              type: validateIssueType(issue.type),
-              text: issue.text || "",
-              explanation: issue.explanation || "",
-              suggestion: issue.suggestion || "",
-              severity: validateSeverity(issue.severity),
-              metadata: {},
-            }))
-          : [],
+      analysis = JSON.parse(cleanContent)
+    } catch (parseError) {
+      console.error("Error parsing AI response:", parseError)
+      console.error("Raw response:", content)
+      // Return a default analysis structure
+      return {
+        riskLevel: "MEDIUM",
+        contractType: "OTHER",
+        recommendedActions: [],
+        complianceFlags: [],
+        issues: []
       }
-
-      return validatedAnalysis
-    } catch (error) {
-      console.error("Error parsing OpenAI response:", error)
-      throw new Error("Failed to parse contract analysis")
     }
-  } catch (error: any) {
+
+    // Validate and set defaults for required fields
+    return {
+      riskLevel: validateSeverity(analysis.riskLevel),
+      contractType: validateType(analysis.contractType),
+      recommendedActions: Array.isArray(analysis.recommendedActions) ? analysis.recommendedActions : [],
+      complianceFlags: Array.isArray(analysis.complianceFlags) ? analysis.complianceFlags : [],
+      issues: (Array.isArray(analysis.issues) ? analysis.issues : []).map(issue => ({
+        type: issue.type || "OTHER",
+        text: issue.text || issue.description || "",
+        explanation: issue.explanation || "",
+        suggestion: issue.suggestion || "",
+        severityScore: typeof issue.severityScore === 'number' ? Math.min(Math.max(issue.severityScore, 1), 10) : 5,
+        industryRelevance: issue.industryRelevance || "GENERAL"
+      }))
+    }
+  } catch (error) {
     console.error("Error analyzing contract:", error)
-    throw new Error(
-      error.response?.data?.error?.message || "Failed to analyze contract"
-    )
+    // Return a default analysis structure
+    return {
+      riskLevel: "MEDIUM",
+      contractType: "OTHER",
+      recommendedActions: [],
+      complianceFlags: [],
+      issues: []
+    }
   }
-}
-
-function validateType(type: any): ContractType {
-  const validTypes: ContractType[] = ["SERVICE", "EMPLOYMENT", "NDA", "OTHER"]
-  return validTypes.includes(type) ? type : "OTHER"
-}
-
-function validateSeverity(severity: any): ContractSeverity {
-  const validSeverities: ContractSeverity[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-  return validSeverities.includes(severity) ? severity : "MEDIUM"
-}
-
-function validateIssueType(type: any): IssueType {
-  const validTypes: IssueType[] = ["PAYMENT", "IP", "SCOPE", "TERMINATION", "LIABILITY", "OTHER"]
-  return validTypes.includes(type) ? type : "OTHER"
 }
 

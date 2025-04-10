@@ -42,7 +42,7 @@ export default function DashboardPage() {
       try {
         setIsLoading(true)
         const response = await fetch("/api/contracts")
-        
+
         if (!response.ok) {
           // If the API returns an error, just set empty arrays
           // This is likely the case for new users with no contracts
@@ -51,7 +51,7 @@ export default function DashboardPage() {
           setRecentContracts([])
           return
         }
-        
+
         const data = await response.json()
         setContracts(data || [])
         
@@ -70,7 +70,7 @@ export default function DashboardPage() {
         setIsLoading(false)
       }
     }
-    
+
     fetchContracts()
   }, [toast])
 
@@ -95,7 +95,7 @@ export default function DashboardPage() {
           </Badge>
         )
       case "LOW":
-        return (
+    return (
           <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
             Low Risk
           </Badge>
@@ -139,7 +139,7 @@ export default function DashboardPage() {
               <PlusCircle className="h-4 w-4" /> Analyze New Contract
             </span>
           </Link>
-        </Button>
+          </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -224,14 +224,14 @@ export default function DashboardPage() {
                 <Link href="/dashboard/contracts/new" className="flex items-center gap-2">
                   <PlusCircle className="h-4 w-4" /> Analyze Your First Contract
                 </Link>
-              </Button>
+          </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {recentContracts.map((contract) => (
               <Card 
-                key={contract.id} 
+                key={contract.id}
                 className="hover:shadow-md transition-shadow cursor-pointer border-l-4"
                 style={{
                   borderLeftColor: 
