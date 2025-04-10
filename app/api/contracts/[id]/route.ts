@@ -11,21 +11,22 @@ export async function GET(
     const { userId } = await auth();
 
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const contractId = params?.id;
-    if (!contractId) {
-      return new NextResponse("Contract ID is required", { status: 400 });
+    if (!params?.id) {
+      return NextResponse.json({ error: "Contract ID is required" }, { status: 400 });
     }
 
+    const contractId = params.id;
+    
     // Find the user in our database
     const dbUser = await db.user.findUnique({
       where: { clerkId: userId }
     });
 
     if (!dbUser) {
-      return new NextResponse("User not found", { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const contract = await db.contract.findUnique({
@@ -39,38 +40,48 @@ export async function GET(
     });
 
     if (!contract) {
-      return new NextResponse("Contract not found", { status: 404 });
+      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
     }
 
-    // Format the response to match the frontend expectations
-    const formattedContract = {
-      id: contract.id,
-      title: contract.title,
-      originalText: contract.originalText,
-      riskLevel: contract.riskLevel || "MEDIUM",
-      contractType: contract.contractType || "OTHER",
-      recommendedActions: typeof contract.recommendedActions === 'string' 
-        ? JSON.parse(contract.recommendedActions)
-        : contract.recommendedActions || [],
-      complianceFlags: typeof contract.complianceFlags === 'string'
-        ? JSON.parse(contract.complianceFlags)
-        : contract.complianceFlags || [],
-      issues: contract.issues.map(issue => ({
-        type: issue.type,
-        description: issue.text,
-        severityScore: issue.severityScore,
-        industryRelevance: issue.industryRelevance || "GENERAL"
-      })),
-      createdAt: contract.createdAt.toISOString(),
-      updatedAt: contract.updatedAt.toISOString()
+    // Helper function to safely parse JSON or handle arrays
+    const safeParseJSON = (value: string | string[] | null | undefined, defaultValue: any[] = []) => {
+      if (!value) return defaultValue;
+      if (Array.isArray(value)) return value;
+      try {
+        return JSON.parse(value);
+      } catch (e) {
+        console.error("Error parsing JSON:", e);
+        return defaultValue;
+      }
     };
 
+    // Format the response to match the frontend expectations
     return NextResponse.json({
       success: true,
-      contract: formattedContract
+      contract: {
+        id: contract.id,
+        title: contract.title || "Untitled Contract",
+        originalText: contract.originalText || "",
+        riskLevel: contract.riskLevel || "MEDIUM",
+        contractType: contract.contractType || "OTHER",
+        recommendedActions: safeParseJSON(contract.recommendedActions),
+        complianceFlags: safeParseJSON(contract.complianceFlags),
+        issues: (contract.issues || []).map(issue => ({
+          id: issue.id,
+          type: issue.type || "Unknown Issue",
+          description: issue.text || "No description available",
+          severityScore: typeof issue.severityScore === 'number' ? issue.severityScore : 0,
+          industryRelevance: issue.industryRelevance || "GENERAL"
+        })),
+        createdAt: contract.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: contract.updatedAt?.toISOString() || new Date().toISOString()
+      }
     });
   } catch (error) {
     console.error("Error fetching contract:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json({ 
+      error: "Internal Server Error",
+      details: error instanceof Error ? error.message : "Unknown error occurred"
+    }, { status: 500 });
   }
 }

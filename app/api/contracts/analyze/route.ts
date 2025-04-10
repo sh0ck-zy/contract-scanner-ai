@@ -27,17 +27,30 @@ export async function POST(req: NextRequest) {
       console.log("[CONTRACT_ANALYSIS] No text provided")
       return NextResponse.json({ error: "No text provided" }, { status: 400 })
     }
-    
-    console.log(`[CONTRACT_ANALYSIS] Analyzing contract: ${title}, freelancer type: ${freelancerType}, industry: ${industry}, region: ${region}`)
+
+    // Log the input for debugging
+    console.log("[CONTRACT_ANALYSIS] Input:", {
+      textLength: text.length,
+      title,
+      freelancerType,
+      industry,
+      region
+    })
     
     // Analyze the contract with AI
     let analysis;
     try {
       analysis = await analyzeContractAdvanced(text, {
-        industry,
+        industry: industry || freelancerType,
         region,
       });
-      console.log("[CONTRACT_ANALYSIS] Contract analyzed successfully");
+      console.log("[CONTRACT_ANALYSIS] Analysis result:", {
+        riskLevel: analysis.riskLevel,
+        contractType: analysis.contractType,
+        issuesCount: analysis.issues.length,
+        recommendedActionsCount: analysis.recommendedActions.length,
+        complianceFlagsCount: analysis.complianceFlags.length
+      });
     } catch (error) {
       console.error("[CONTRACT_ANALYSIS] Analysis error:", error);
       return NextResponse.json({ 
@@ -66,20 +79,20 @@ export async function POST(req: NextRequest) {
       contract = await db.contract.create({
         data: {
           userId: dbUser.id,
-          title,
+          title: title || "Untitled Contract",
           originalText: text,
           riskLevel: analysis.riskLevel,
           contractType: analysis.contractType,
-          recommendedActions: analysis.recommendedActions,
-          complianceFlags: analysis.complianceFlags,
+          recommendedActions: JSON.stringify(analysis.recommendedActions || []),
+          complianceFlags: JSON.stringify(analysis.complianceFlags || []),
           issues: {
-            create: analysis.issues.map(issue => ({
-              type: issue.type,
-              text: issue.text,
-              explanation: issue.explanation,
-              suggestion: issue.suggestion,
-              severityScore: issue.severityScore,
-              industryRelevance: issue.industryRelevance
+            create: (analysis.issues || []).map(issue => ({
+              type: issue.type || "OTHER",
+              text: issue.text || "",
+              explanation: issue.explanation || "",
+              suggestion: issue.suggestion || "",
+              severityScore: issue.severityScore || 5,
+              industryRelevance: issue.industryRelevance || "GENERAL"
             }))
           }
         },
@@ -88,7 +101,11 @@ export async function POST(req: NextRequest) {
         }
       });
       
-      console.log(`[CONTRACT_ANALYSIS] Contract ${contract.id} saved successfully`);
+      console.log(`[CONTRACT_ANALYSIS] Contract ${contract.id} saved with:`, {
+        issuesCount: contract.issues.length,
+        riskLevel: contract.riskLevel,
+        contractType: contract.contractType
+      });
       
       return NextResponse.json({
         success: true,
@@ -97,6 +114,12 @@ export async function POST(req: NextRequest) {
           title: contract.title,
           riskLevel: contract.riskLevel,
           contractType: contract.contractType,
+          recommendedActions: typeof contract.recommendedActions === 'string' 
+            ? JSON.parse(contract.recommendedActions)
+            : contract.recommendedActions || [],
+          complianceFlags: typeof contract.complianceFlags === 'string'
+            ? JSON.parse(contract.complianceFlags)
+            : contract.complianceFlags || [],
           issues: contract.issues,
           createdAt: contract.createdAt
         }

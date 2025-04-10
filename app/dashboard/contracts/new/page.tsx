@@ -165,6 +165,9 @@ export default function AnalyzeContractPage() {
               try {
                 const errorData = await response.json()
                 errorMessage = errorData.error || errorData.message || errorMessage
+                if (errorData.details) {
+                  console.error("Error details:", errorData.details)
+                }
               } catch (e) {
                 console.error("Error parsing error response:", e)
                 errorMessage = `Server error: ${response.status} ${response.statusText}`
@@ -173,13 +176,21 @@ export default function AnalyzeContractPage() {
             }
 
             const data = await response.json()
+            if (!data.success) {
+              throw new Error(data.error || "Failed to analyze contract")
+            }
+
             toast({
               title: "Analysis Complete",
               description: "Your contract has been analyzed successfully.",
             })
             
             setTimeout(() => {
-              router.push(`/dashboard/contracts/${data.id}`)
+              const contractId = data.contractId || data.contract?.id
+              if (!contractId) {
+                throw new Error("No contract ID received from server")
+              }
+              router.push(`/dashboard/contracts/${contractId}`)
             }, 500)
           } catch (error: any) {
             console.error("PDF analysis error:", error)
@@ -220,35 +231,33 @@ export default function AnalyzeContractPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: title || "Untitled Contract",
-          contractText: textToAnalyze,
-          freelancerType: freelancerType
+          text: textToAnalyze,
+          title: title,
         }),
-      })
+      });
 
-      clearInterval(progressInterval)
-      setAnalyzeProgress(100)
-
-      // Log the raw response text to see what's happening
-      const responseText = await response.text()
-      console.log("Raw API Response:", responseText)
-      
       if (!response.ok) {
-        throw new Error(responseText || "Failed to analyze contract")
+        throw new Error("Failed to analyze contract");
       }
 
-      // Parse the response text manually since we already consumed it
-      const data = responseText ? JSON.parse(responseText) : {}
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || "Failed to analyze contract");
+      }
 
-      // Redirect to the contract details page with slight delay to show 100% progress
       toast({
         title: "Analysis Complete",
         description: "Your contract has been analyzed successfully.",
-      })
-      
+      });
+
       setTimeout(() => {
-        router.push(`/dashboard/contracts/${data.id}`)
-      }, 500)
+        const contractId = data.contractId || data.contract?.id;
+        if (!contractId) {
+          throw new Error("No contract ID received from server");
+        }
+        router.push(`/dashboard/contracts/${contractId}`);
+      }, 500);
     } catch (error: any) {
       console.error("Error analyzing contract:", error)
       setAnalyzeProgress(0)

@@ -7,6 +7,28 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, AlertTriangle, CheckCircle2, XCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { use } from "react"
+
+// Utility function for date formatting
+const formatDate = (dateString: string) => {
+  try {
+    const date = new Date(dateString)
+    // Check if date is valid before formatting
+    if (isNaN(date.getTime())) {
+      return "N/A"
+    }
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date)
+  } catch (e) {
+    console.error("Date formatting error:", e)
+    return "N/A"
+  }
+}
 
 interface Contract {
   id: string
@@ -29,17 +51,19 @@ interface Contract {
 export default function ContractResultsPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   const router = useRouter()
   const [contract, setContract] = useState<Contract | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Unwrap the params Promise
+  const { id: contractId } = use(params)
 
   useEffect(() => {
     const fetchContract = async () => {
       try {
-        const contractId = params?.id
         if (!contractId) {
           setError("Contract ID is required")
           setLoading(false)
@@ -48,12 +72,13 @@ export default function ContractResultsPage({
 
         const response = await fetch(`/api/contracts/${contractId}`)
         if (!response.ok) {
-          throw new Error("Failed to fetch contract")
+          const errorText = await response.text()
+          throw new Error(`Failed to fetch contract: ${errorText}`)
         }
 
         const data = await response.json()
-        if (!data.success) {
-          throw new Error("Failed to fetch contract")
+        if (!data.success || !data.contract) {
+          throw new Error("Invalid contract data received")
         }
 
         setContract(data.contract)
@@ -66,7 +91,7 @@ export default function ContractResultsPage({
     }
 
     fetchContract()
-  }, [params?.id])
+  }, [contractId])
 
   if (loading) {
     return (
@@ -130,9 +155,9 @@ export default function ContractResultsPage({
     <div className="container mx-auto py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{contract.title}</h1>
+          <h1 className="text-2xl font-bold">{contract?.title || "Untitled Contract"}</h1>
           <p className="text-muted-foreground">
-            Analyzed on {new Date(contract.createdAt).toLocaleDateString()}
+            Analyzed on {contract?.createdAt ? formatDate(contract.createdAt) : "N/A"}
           </p>
         </div>
         <Button variant="outline" onClick={() => router.push("/dashboard")}>
@@ -154,19 +179,19 @@ export default function ContractResultsPage({
                 </p>
                 <Badge
                   variant={
-                    contract.riskLevel === "HIGH" || contract.riskLevel === "CRITICAL"
+                    contract?.riskLevel === "HIGH" || contract?.riskLevel === "CRITICAL"
                       ? "destructive"
                       : "secondary"
                   }
                 >
-                  {contract.riskLevel}
+                  {contract?.riskLevel || "MEDIUM"}
                 </Badge>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Contract Type
                 </p>
-                <p className="text-lg font-medium">{contract.contractType}</p>
+                <p className="text-lg font-medium">{contract?.contractType || "OTHER"}</p>
               </div>
             </div>
           </CardContent>
@@ -178,7 +203,7 @@ export default function ContractResultsPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {contract.complianceFlags.length > 0 ? (
+              {contract?.complianceFlags && contract.complianceFlags.length > 0 ? (
                 <div className="space-y-2">
                   {contract.complianceFlags.map((flag, index) => (
                     <div
@@ -191,7 +216,7 @@ export default function ContractResultsPage({
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No compliance flags found</p>
+                <p className="text-muted-foreground">No compliance flags detected in this contract</p>
               )}
             </div>
           </CardContent>
@@ -203,7 +228,7 @@ export default function ContractResultsPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {contract.issues.length > 0 ? (
+              {contract?.issues && contract.issues.length > 0 ? (
                 contract.issues.map((issue, index) => (
                   <div
                     key={index}
@@ -218,21 +243,21 @@ export default function ContractResultsPage({
                               : "secondary"
                           }
                         >
-                          {issue.type}
+                          {issue.type || "Unknown Issue"}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
-                          Severity: {issue.severityScore}/10
+                          Severity: {issue.severityScore || 0}/10
                         </span>
                       </div>
                       <Badge variant="outline">
-                        {issue.industryRelevance}
+                        {issue.industryRelevance || "GENERAL"}
                       </Badge>
                     </div>
-                    <p className="mt-2">{issue.description}</p>
+                    <p className="mt-2">{issue.description || "No description available"}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-muted-foreground">No issues found</p>
+                <p className="text-muted-foreground">No issues detected in this contract</p>
               )}
             </div>
           </CardContent>
@@ -244,7 +269,7 @@ export default function ContractResultsPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {contract.recommendedActions.length > 0 ? (
+              {contract?.recommendedActions && contract.recommendedActions.length > 0 ? (
                 <ul className="list-inside list-disc space-y-2">
                   {contract.recommendedActions.map((action, index) => (
                     <li key={index}>{action}</li>
@@ -252,7 +277,7 @@ export default function ContractResultsPage({
                 </ul>
               ) : (
                 <p className="text-muted-foreground">
-                  No specific actions recommended
+                  No specific actions needed for this contract
                 </p>
               )}
             </div>
